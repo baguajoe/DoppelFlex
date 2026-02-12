@@ -1,130 +1,492 @@
+/* src/front/styles/UploadPage.css */
+/* Complete Avatar Creation Flow Styling */
+
+.upload-container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+/* ─── Toast Notifications ─── */
 .toast-message {
-    background-color: #222;
-    color: #fff;
-    padding: 10px 20px;
-    border-radius: 8px;
-    text-align: center;
-    margin: 10px auto;
-    width: fit-content;
-    animation: fadein 0.4s ease, fadeout 0.4s ease 2.6s;
+  position: fixed;
+  top: 80px;
+  right: 20px;
+  padding: 12px 20px;
+  background: var(--df-bg-surface, #1a1a28);
+  border: 1px solid var(--df-success, #00e676);
+  border-radius: var(--df-radius-md, 10px);
+  color: var(--df-text-primary, white);
+  font-weight: 500;
+  z-index: 1000;
+  animation: slideIn 0.3s ease;
+  box-shadow: 0 4px 20px rgba(0, 230, 118, 0.2);
+}
+
+.toast-message.toast-error {
+  border-color: var(--df-error, #ff5c72);
+  box-shadow: 0 4px 20px rgba(255, 92, 114, 0.2);
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* ─── Progress Bar ─── */
+.progress-bar {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 40px;
+  padding: 20px 0;
+  position: relative;
+}
+
+.progress-bar::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 10%;
+  right: 10%;
+  height: 2px;
+  background: var(--df-border, rgba(255, 255, 255, 0.08));
+  transform: translateY(-50%);
+  z-index: 0;
+}
+
+.progress-step-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  z-index: 1;
+}
+
+.progress-step {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--df-bg-surface, #1a1a28);
+  border: 2px solid var(--df-border, rgba(255, 255, 255, 0.08));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--df-text-muted, #606070);
+  transition: all 0.3s ease;
+}
+
+.progress-step.active {
+  background: var(--df-primary, #7c6aef);
+  border-color: var(--df-primary, #7c6aef);
+  color: white;
+  box-shadow: 0 0 20px rgba(124, 106, 239, 0.4);
+}
+
+.step-label {
+  font-size: 12px;
+  color: var(--df-text-secondary, #a0a0b0);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* ─── Step Sections ─── */
+.step-section {
+  background: var(--df-bg-card, rgba(255, 255, 255, 0.03));
+  border: 1px solid var(--df-border, rgba(255, 255, 255, 0.08));
+  border-radius: var(--df-radius-lg, 14px);
+  padding: 30px;
+  margin-bottom: 20px;
+}
+
+.step-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 10px;
+  color: var(--df-text-primary, white);
+}
+
+.step-description {
+  color: var(--df-text-secondary, #a0a0b0);
+  margin-bottom: 20px;
+}
+
+/* ─── Tips Card ─── */
+.tips-card {
+  background: rgba(124, 106, 239, 0.1);
+  border: 1px solid rgba(124, 106, 239, 0.2);
+  border-radius: var(--df-radius-md, 10px);
+  padding: 20px;
+  margin-top: 20px;
+}
+
+.tips-card h4 {
+  margin-bottom: 10px;
+  color: var(--df-primary-light, #9d8df7);
+}
+
+.tips-card ul {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--df-text-secondary, #a0a0b0);
+}
+
+.tips-card li {
+  margin-bottom: 6px;
+}
+
+/* ─── Preview Section ─── */
+.preview-section {
+  text-align: center;
+}
+
+.detection-info {
+  margin-top: 15px;
+}
+
+.confidence-badge {
+  display: inline-block;
+  padding: 6px 14px;
+  background: rgba(0, 230, 118, 0.15);
+  border: 1px solid rgba(0, 230, 118, 0.3);
+  border-radius: 20px;
+  color: var(--df-success, #00e676);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* ─── Quality Selection ─── */
+.quality-section {
+  margin-top: 30px;
+  padding-top: 20px;
+  border-top: 1px solid var(--df-border, rgba(255, 255, 255, 0.08));
+}
+
+.quality-section h3 {
+  margin-bottom: 10px;
+}
+
+.quality-section p {
+  color: var(--df-text-secondary, #a0a0b0);
+  margin-bottom: 20px;
+}
+
+.quality-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 15px;
+  margin-bottom: 25px;
+}
+
+.quality-option {
+  display: flex;
+  flex-direction: column;
+  padding: 15px;
+  background: var(--df-bg-surface, #1a1a28);
+  border: 2px solid var(--df-border, rgba(255, 255, 255, 0.08));
+  border-radius: var(--df-radius-md, 10px);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.quality-option:hover {
+  border-color: var(--df-border-light, rgba(255, 255, 255, 0.12));
+}
+
+.quality-option.selected {
+  border-color: var(--df-primary, #7c6aef);
+  background: rgba(124, 106, 239, 0.1);
+}
+
+.quality-option input {
+  display: none;
+}
+
+.quality-label {
+  font-weight: 600;
+  font-size: 16px;
+  margin-bottom: 4px;
+}
+
+.quality-desc {
+  font-size: 12px;
+  color: var(--df-text-muted, #606070);
+}
+
+/* ─── Mesh Preview ─── */
+.mesh-preview {
+  background: var(--df-bg-surface, #1a1a28);
+  border-radius: var(--df-radius-md, 10px);
+  padding: 20px;
+  min-height: 400px;
+}
+
+/* ─── Action Buttons ─── */
+.action-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 20px;
+}
+
+/* ─── Buttons ─── */
+.btn-primary,
+.btn-secondary,
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 24px;
+  font-size: 15px;
+  font-weight: 500;
+  border: none;
+  border-radius: var(--df-radius-md, 10px);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--df-primary, #7c6aef), var(--df-primary-dark, #5a4ad4));
+  color: white;
+  box-shadow: 0 4px 15px rgba(124, 106, 239, 0.3);
+}
+
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 25px rgba(124, 106, 239, 0.4);
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-large {
+  padding: 16px 32px;
+  font-size: 17px;
+}
+
+.btn-secondary {
+  background: var(--df-bg-surface, #1a1a28);
+  color: var(--df-text-primary, white);
+  border: 1px solid var(--df-border, rgba(255, 255, 255, 0.08));
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--df-bg-elevated, #12121c);
+  border-color: var(--df-border-light, rgba(255, 255, 255, 0.12));
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--df-text-secondary, #a0a0b0);
+}
+
+.btn-ghost:hover {
+  color: var(--df-text-primary, white);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* ─── Avatar Options ─── */
+.avatar-options {
+  text-align: center;
+}
+
+.option-note {
+  margin: 20px 0 10px;
+  color: var(--df-text-muted, #606070);
+  font-size: 14px;
+}
+
+/* ─── Final Avatar ─── */
+.final-avatar {
+  text-align: center;
+}
+
+.export-section {
+  margin: 30px 0;
+  padding: 25px;
+  background: var(--df-bg-surface, #1a1a28);
+  border-radius: var(--df-radius-md, 10px);
+}
+
+.export-section h4 {
+  margin-bottom: 15px;
+}
+
+.export-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.export-note {
+  margin-top: 15px;
+  font-size: 13px;
+  color: var(--df-text-muted, #606070);
+}
+
+/* ─── Next Steps ─── */
+.next-steps {
+  margin: 30px 0;
+}
+
+.next-steps h4 {
+  margin-bottom: 15px;
+}
+
+.next-links {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.next-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 20px;
+  background: var(--df-bg-card, rgba(255, 255, 255, 0.03));
+  border: 1px solid var(--df-border, rgba(255, 255, 255, 0.08));
+  border-radius: var(--df-radius-md, 10px);
+  color: var(--df-text-primary, white);
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.next-link:hover {
+  border-color: var(--df-primary, #7c6aef);
+  transform: translateY(-2px);
+}
+
+/* ─── Loading Overlay ─── */
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(10, 10, 18, 0.9);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 3px solid var(--df-border, rgba(255, 255, 255, 0.08));
+  border-top-color: var(--df-primary, #7c6aef);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-overlay p {
+  margin-top: 20px;
+  color: var(--df-text-secondary, #a0a0b0);
+  font-size: 16px;
+}
+
+/* ─── Skeleton Loader ─── */
+.skeleton-loader {
+  width: 100%;
+  height: 300px;
+  background: linear-gradient(
+    90deg,
+    var(--df-bg-surface, #1a1a28) 25%,
+    var(--df-bg-elevated, #12121c) 50%,
+    var(--df-bg-surface, #1a1a28) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--df-radius-md, 10px);
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ─── Debug Panel ─── */
+.debug-panel {
+  margin-top: 30px;
+  padding: 15px;
+  background: var(--df-bg-surface, #1a1a28);
+  border: 1px solid var(--df-border, rgba(255, 255, 255, 0.08));
+  border-radius: var(--df-radius-md, 10px);
+}
+
+.debug-panel summary {
+  cursor: pointer;
+  color: var(--df-text-muted, #606070);
+  font-size: 14px;
+}
+
+.debug-panel pre {
+  margin-top: 15px;
+  padding: 15px;
+  background: var(--df-bg-base, #0a0a12);
+  border-radius: 8px;
+  font-size: 12px;
+  overflow-x: auto;
+  color: var(--df-text-secondary, #a0a0b0);
+}
+
+/* ─── Responsive ─── */
+@media (max-width: 768px) {
+  .upload-container {
+    padding: 15px;
   }
   
-  @keyframes fadein {
-    from { opacity: 0; transform: translateY(-10px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-  
-  @keyframes fadeout {
-    from { opacity: 1; transform: translateY(0); }
-    to { opacity: 0; transform: translateY(-10px); }
+  .step-section {
+    padding: 20px;
   }
   
   .progress-bar {
-    display: flex;
-    justify-content: space-around;
-    margin: 20px auto;
-    max-width: 600px;
-  }
-  
-  .progress-step-container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
+    padding: 15px 0;
   }
   
   .progress-step {
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    background-color: lightgray;
-    margin-bottom: 5px;
-  }
-  
-  .progress-step.active {
-    background-color: limegreen;
-  }
-  
-  .step-label {
+    width: 30px;
+    height: 30px;
     font-size: 12px;
   }
   
-  .skeleton-loader {
+  .step-label {
+    font-size: 10px;
+  }
+  
+  .quality-options {
+    grid-template-columns: 1fr;
+  }
+  
+  .action-buttons,
+  .export-buttons,
+  .next-links {
+    flex-direction: column;
+  }
+  
+  .btn-primary,
+  .btn-secondary,
+  .next-link {
     width: 100%;
-    height: 200px;
-    background: linear-gradient(90deg, #eee, #ccc, #eee);
-    animation: shimmer 1.2s infinite;
-    margin-top: 10px;
-    border-radius: 10px;
   }
-  
-  @keyframes shimmer {
-    0% { background-position: -200px 0; }
-    100% { background-position: 200px 0; }
-  }
-  
-  .btn-primary, .btn-secondary {
-    padding: 10px 20px;
-    margin: 10px 5px;
-    font-size: 16px;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: 0.3s;
-  }
-  
-  .btn-primary {
-    background-color: #007bff;
-    color: white;
-  }
-  
-  .btn-secondary {
-    background-color: #f0f0f0;
-    color: #333;
-  }
-  
-  .btn-primary:hover,
-  .btn-secondary:hover {
-    transform: scale(1.03);
-  }
-  
-  .btn-primary:hover {
-    background-color: #0056b3;
-  }
-  
-  .btn-secondary:hover {
-    background-color: #ddd;
-  }
-  
-  .preview-section,
-  .mesh-section,
-  .mesh-preview,
-  .avatar-generation,
-  .final-avatar {
-    background: #fff;
-    border: 1px solid #ddd;
-    border-radius: 12px;
-    padding: 20px;
-    margin: 20px auto;
-    max-width: 700px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-  }
-  
-  @media (max-width: 768px) {
-    .upload-container {
-      padding: 10px;
-    }
-  
-    .progress-bar {
-      flex-direction: column;
-      align-items: center;
-    }
-  
-    .btn-primary, .btn-secondary {
-      width: 100%;
-      font-size: 14px;
-    }
-  
-    .skeleton-loader {
-      height: 150px;
-    }
-  }
+}

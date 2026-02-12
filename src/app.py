@@ -1,4 +1,3 @@
-
 import os
 from flask import Flask, request, jsonify, url_for, send_from_directory
 from flask_migrate import Migrate
@@ -10,6 +9,7 @@ from api.admin import setup_admin
 from api.commands import setup_commands
 from flask_cors import CORS
 from flask_socketio import SocketIO
+from api.avatar_routes import avatar_api, register_avatar_routes
 import os
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 
@@ -40,6 +40,8 @@ setup_commands(app)
 
 # Register API blueprint
 app.register_blueprint(api, url_prefix='/api')
+register_avatar_routes(app)
+
 
 
 
@@ -90,9 +92,34 @@ def serve_react_fallback(path):
         return send_from_directory(static_file_dir, path)
     return send_from_directory(static_file_dir, 'index.html')
 
-@app.route('/static/uploads/<filename>')
+
+# ============================================
+# STATIC FILE ROUTES (Fixed paths)
+# ============================================
+
+@app.route('/static/uploads/<path:filename>')
 def serve_uploaded_file(filename):
+    """Serve uploaded avatar files"""
     return send_from_directory('../static/uploads', filename)
+
+
+@app.route('/static/exports/<path:filename>')
+def serve_exported_file(filename):
+    """Serve exported avatar files"""
+    return send_from_directory('../static/exports', filename)
+
+
+@app.route('/static/models/<path:filename>')
+def serve_model_file(filename):
+    """Serve default model files"""
+    return send_from_directory('../static/models', filename)
+
+
+@app.route('/static/templates/<path:filename>')
+def serve_template_file(filename):
+    """Serve body template files"""
+    return send_from_directory('../static/templates', filename)
+
 
 if __name__ == '__main__':
     PORT = int(os.environ.get('PORT', 3001))

@@ -7,7 +7,7 @@ import LiveMoCapAvatar from '../component/LiveMoCapAvatar';
 const MotionCapturePage = () => {
   // Use backend URL for static files
   const backendUrl = process.env.REACT_APP_BACKEND_URL || '';
-  const defaultAvatar = `${backendUrl}/static/uploads/me_wit_locks.jpg_avatar.glb`;
+  const defaultAvatar = `${backendUrl}/static/models/rigged_avatar.glb`;
   
   const [avatarUrl, setAvatarUrl] = useState(defaultAvatar);
   const [showVideo, setShowVideo] = useState(true);
@@ -16,8 +16,8 @@ const MotionCapturePage = () => {
 
   // Available avatar models
   const avatarModels = [
-    { name: 'Default Avatar', url: `${backendUrl}/static/uploads/me_wit_locks.jpg_avatar.glb` },
-    { name: 'Rigged Avatar', url: `${backendUrl}/static/models/avatar.glb` },
+    { name: 'Default Avatar', url: `${backendUrl}/static/models/rigged_avatar.glb` },
+    { name: 'Rigged Avatar', url: `${backendUrl}/static/models/rigged_avatar.glb` },
   ];
 
   // Handle each frame (optional - for sending to backend)

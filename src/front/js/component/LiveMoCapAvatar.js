@@ -89,10 +89,11 @@ const LiveAvatar = ({ landmarks, avatarUrl }) => {
 
     // Apply bone rotations
     BONE_CONNECTIONS.forEach(({ bone, from, to }) => {
+      if (bone.includes('Leg')) console.log(bone, 'from:', from, 'to:', to, 'visibility:', landmarks[from]?.visibility, landmarks[to]?.visibility);
       const boneObj = findBone(modelRef.current, bone);
       
       if (boneObj && landmarks[from] && landmarks[to]) {
-        if (landmarks[from].visibility < 0.5 || landmarks[to].visibility < 0.5) {
+        if (landmarks[from].visibility < 0.3 || landmarks[to].visibility < 0.3) {
           return;
         }
 
