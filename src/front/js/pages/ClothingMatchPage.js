@@ -3,7 +3,7 @@ import React, { useState, useContext } from "react";
 import ClothingDetector from "../component/ClothingDetector";
 import OutfitSelector from "../component/OutfitSelector";
 import { matchOutfitsFromCaption } from "../../../utils/matchOutfits";
-import {AvatarPreview} from "../component/AvatarPreview";
+import AvatarPreview from "../component/AvatarPreview";
 import { Context } from "../store/appContext";
 
 const ClothingMatchPage = () => {

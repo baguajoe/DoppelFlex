@@ -14,24 +14,37 @@ import json
 import uuid
 import trimesh
 import stripe
+import logging
 
 # import moviepy
-from moviepy import AudioFileClip, VideoFileClip, ImageSequenceClip
+
+# from moviepy.editor import AudioFileClip, VideoFileClip, ImageSequenceClip
+from moviepy.editor import AudioFileClip, VideoFileClip, ImageSequenceClip
 from moviepy.video.io.ffmpeg_tools import ffmpeg_extract_subclip
+
+
+
+
 
 from flask import send_file
 from uuid import uuid4
 import os
-from utils.video import generate_frame_images
+from api.utils.video import generate_frame_images
 
 
 
 
 # from api import api
-from api.models import db, Avatar, Customization, RiggedAvatar, User, UserUsage, MotionCaptureSession, MotionAudioSync, MotionSession, FBXExporter, SavedOutfit, Outfit
-from .utils.process_pose_video import process_and_save_pose
-from .utils.rigging import external_rigging_tool
-from .utils.skeleton_builder import create_default_skeleton
+from api.models import db, Avatar, Customization, RiggedAvatar, User, UserUsage, MotionCaptureSession, MotionAudioSync, MotionSession, FBXExporter, SavedOutfit, Outfit, AvatarPreset
+from api.utils.process_pose_video import process_and_save_pose
+from api.utils.rigging import external_rigging_tool
+from api.utils.skeleton_builder import create_default_skeleton
+from api.utils.selfie_to_depth import selfie_to_avatar
+from api.utils.avatar_merge import merge_head_and_body
+from api.utils.multi_view_to_mesh import generate_mesh_from_views
+
+
+
 from datetime import datetime
 
 
@@ -44,16 +57,9 @@ import librosa
 import cv2
 import mediapipe as mp
 import numpy as np
-import pyvista as pv
-import scipy.spatial as sp
 from dotenv import load_dotenv
 load_dotenv()  # Load environment variables from .env file
-from api.utils.process_pose_video import process_and_save_pose
-from api.utils.face_mesh_detection import detect_face_mesh
-from api.utils.selfie_to_avatar import selfie_to_avatar  # Importing the function from selfie_to_avatar.py
-
-
-
+from .utils.process_pose_video import process_and_save_pose
 
 
 
@@ -76,31 +82,15 @@ STRIPE_PRICE_IDS = {
 mp_pose = mp.solutions.pose
 pose = mp_pose.Pose()
 
-# MediaPipe Face Detection setup
-mp_face_detection = mp.solutions.face_detection
-mp_drawing = mp.solutions.drawing_utils
-
-# MediaPipe Face Mesh setup
-mp_face_mesh = mp.solutions.face_mesh
-face_mesh = mp_face_mesh.FaceMesh(
-    static_image_mode=True,
-    max_num_faces=1,
-    min_detection_confidence=0.5
-)
-
-# Set up Face Detection
-face_detection = mp_face_detection.FaceDetection(min_detection_confidence=0.2)
 
 UPLOAD_FOLDER = os.path.join("static", "uploads")
-EXPORT_FOLDER = os.path.join("static", "exports")
-BODY_FOLDER = os.path.join("static", "bodies")
-THUMBNAIL_FOLDER = os.path.join("static", "thumbnail")
-
+OUTPUT_FOLDER = "static/exports"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-os.makedirs(EXPORT_FOLDER, exist_ok=True)
-os.makedirs(BODY_FOLDER, exist_ok=True)
-os.makedirs(THUMBNAIL_FOLDER, exist_ok=True)
+os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
+# Your Deep3D API Key (make sure to set this in your environment or replace it here)
+DEEP3D_API_URL = "https://api.deep3d.com/generate-avatar"  # Replace with the actual URL
+DEEP3D_API_KEY = os.getenv("DEEP3D_API_KEY")  # Ensure to have the API key securely stored
 
 
 # Enable CORS
@@ -165,7 +155,6 @@ def login():
         "token": token
     }), 200
 
-
 @api.route("/create-avatar", methods=["POST"])
 def create_avatar():
     image = request.files.get("image")
@@ -178,174 +167,63 @@ def create_avatar():
     filepath = os.path.join(UPLOAD_FOLDER, filename)
     image.save(filepath)
 
-    # Use MediaPipe to detect faces in the image
-    img = cv2.imread(filepath)
-    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    results = face_detection.process(img_rgb)
+    try:
+        # ── Step 1: Face Detection (quick validation) ──
+        img = cv2.imread(filepath)
+        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        results = face_detection.process(img_rgb)
 
-    if results.detections:
-        # Draw face detections on the image
-        for detection in results.detections:
-            mp_drawing.draw_detection(img, detection)
-        
-        # Save the processed image (with face detections)
-        processed_filepath = os.path.join(UPLOAD_FOLDER, f"processed_{filename}")
-        cv2.imwrite(processed_filepath, img)
+        if not results.detections:
+            os.remove(filepath)
+            return jsonify({"error": "No face detected in the image. Please upload a clear front-facing photo."}), 400
 
-        avatar_url = f"/static/uploads/{processed_filepath.split(os.sep)[-1]}"
+        print(f"[create-avatar] Face detected in {filename}")
 
-        # Save avatar to the database
-        avatar = Avatar(user_id=user_id, avatar_url=avatar_url, filename=processed_filepath.split(os.sep)[-1])
+        # ── Step 2: Generate 3D mesh from selfie ──
+        # This calls your selfie_to_avatar pipeline:
+        #   - Removes background (rembg)
+        #   - Estimates depth (MiDaS)
+        #   - Generates point cloud → Poisson mesh
+        #   - Exports as .ply
+        ply_path = selfie_to_avatar(filepath, output_path=EXPORT_FOLDER)
+        print(f"[create-avatar] PLY mesh generated: {ply_path}")
+
+        if not ply_path or not os.path.exists(ply_path):
+            return jsonify({"error": "3D mesh generation failed."}), 500
+
+        # ── Step 3: Convert .ply to .glb using trimesh ──
+        mesh = trimesh.load(ply_path)
+        glb_filename = os.path.splitext(os.path.basename(ply_path))[0] + ".glb"
+        glb_path = os.path.join(EXPORT_FOLDER, glb_filename)
+        mesh.export(glb_path, file_type="glb")
+        print(f"[create-avatar] GLB exported: {glb_path}")
+
+        if not os.path.exists(glb_path):
+            return jsonify({"error": "GLB conversion failed."}), 500
+
+        # ── Step 4: Save to database ──
+        avatar_url = f"/static/exports/{glb_filename}"
+        avatar = Avatar(
+            user_id=user_id,
+            avatar_url=avatar_url,
+            filename=glb_filename
+        )
         db.session.add(avatar)
         db.session.commit()
 
-        return jsonify({"avatar_url": avatar_url}), 200
-    else:
-        return jsonify({"error": "No face detected in the image"}), 400
+        print(f"[create-avatar] Avatar saved to DB: id={avatar.id}, url={avatar_url}")
 
-
-@api.route("/generate-avatar", methods=["POST"])
-def generate_avatar():
-    try:
-        # Log the start of processing
-        print("Starting avatar generation process")
-        
-        # Check if required libraries are available
-        try:
-            import pyvista as pv
-            import scipy.spatial as sp
-        except ImportError as e:
-            print(f"Missing required library: {str(e)}")
-            return jsonify({"error": f"Server missing required library: {str(e)}"}), 500
-        
-        # Initialize MediaPipe Face Mesh inside the function
-        mp_face_mesh = mp.solutions.face_mesh
-        face_mesh = mp_face_mesh.FaceMesh(
-            static_image_mode=True,
-            max_num_faces=1,
-            min_detection_confidence=0.5
-        )
-
-        # Retrieve the image(s) from the request
-        image = request.files.get("image")  # Single image upload
-        front_image = request.files.get("front_image")  # Front view for multi-view
-        left_image = request.files.get("left_image")  # Left view for multi-view
-        right_image = request.files.get("right_image")  # Right view for multi-view
-
-        # Check if either single or multiple images are provided
-        if not (image or (front_image and left_image and right_image)):
-            return jsonify({"error": "At least one image or all three views (front, left, right) are required"}), 400
-
-        filename = secure_filename(image.filename if image else front_image.filename)
-        filepath = os.path.join(UPLOAD_FOLDER, filename)
-
-        if image:
-            image.save(filepath)  # Save the single image
-        elif front_image and left_image and right_image:
-            # Save the three views if provided
-            front_filepath = os.path.join(UPLOAD_FOLDER, "front_" + filename)
-            left_filepath = os.path.join(UPLOAD_FOLDER, "left_" + filename)
-            right_filepath = os.path.join(UPLOAD_FOLDER, "right_" + filename)
-
-            front_image.save(front_filepath)
-            left_image.save(left_filepath)
-            right_image.save(right_filepath)
-
-        print(f"Image(s) saved to {filepath}")
-
-        # Read image and convert to RGB
-        img = cv2.imread(filepath)
-        if img is None:
-            print(f"Failed to read image at {filepath}")
-            return jsonify({"error": "Failed to read uploaded image"}), 400
-
-        h, w, _ = img.shape
-        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-
-        print("Processing with face mesh")
-        results = face_mesh.process(img_rgb)
-        if not results.multi_face_landmarks:
-            return jsonify({"error": "No face landmarks found"}), 400
-
-        # Generate mesh (using face mesh landmarks)
-        landmarks = results.multi_face_landmarks[0]
-        vertices = np.array([[lm.x * w, lm.y * h, lm.z * 100] for lm in landmarks.landmark])
-
-        # Use the actual triangulation from MediaPipe
-        from mediapipe.python.solutions.face_mesh_connections import FACEMESH_TESSELATION
-        
-        # Create proper faces for trimesh
-        edges = {}
-        for connection in FACEMESH_TESSELATION:
-            a, b = connection
-            if a not in edges:
-                edges[a] = []
-            if b not in edges:
-                edges[b] = []
-            edges[a].append(b)
-            edges[b].append(a)
-
-        faces = []
-        visited = set()
-
-        for i in range(len(vertices)):
-            if i in edges:
-                neighbors = edges[i]
-                for j in range(len(neighbors)):
-                    for k in range(j+1, len(neighbors)):
-                        face = sorted([i, neighbors[j], neighbors[k]])
-                        face_tuple = tuple(face)
-                        if face_tuple not in visited:
-                            if neighbors[j] in edges.get(neighbors[k], []):
-                                faces.append(face)
-                                visited.add(face_tuple)
-
-        # Step 1: Poisson Surface Reconstruction using PyVista
-        point_cloud = pv.PolyData(vertices)
-        surface = point_cloud.reconstruct_surface(method='poisson', depth=9)  # Poisson reconstruction
-
-        # Step 2: Apply Laplacian smoothing to the surface
-        surface = surface.smooth(n_iter=100, relaxation_factor=0.1)  # Apply smoothing
-
-        # Save the surface as .ply or .stl file
-        surface_path = os.path.join(UPLOAD_FOLDER, f"{filename}_surface.ply")
-        surface.save(surface_path)
-
-        # Step 3: Apply Ear Clipping Triangulation (if you want to replace Delaunay)
-        def ear_clipping_triangulation(points):
-            tri = sp.Delaunay(points)  # Perform Delaunay triangulation
-            return tri.simplices
-
-        triangles = ear_clipping_triangulation(vertices)
-
-        # Step 4: Create mesh with Trimesh and apply Laplacian smoothing
-        mesh = trimesh.Trimesh(vertices=vertices, faces=triangles)
-        mesh = mesh.subdivide()  # Apply Laplacian smoothing to mesh
-
-        # Export the final mesh (GLB format)
-        output_path = os.path.join(UPLOAD_FOLDER, f"{filename}_avatar.glb")
-        mesh.export(output_path)
-
-        # Verify file creation
-        if not os.path.exists(output_path):
-            print(f"ERROR: File was not created at {output_path}")
-            return jsonify({"error": "Failed to create avatar file"}), 500
-
-        print(f"SUCCESS: File created at {output_path} (size: {os.path.getsize(output_path)} bytes)")
-
-        # Generate avatar URL for the frontend
-        avatar_url = f"/static/uploads/{os.path.basename(output_path)}"
-        print(f"Returning URL: {avatar_url}")
-
-        return jsonify({"avatar_model_url": avatar_url}), 200
+        return jsonify({
+            "avatar_url": avatar_url,
+            "avatar_id": avatar.id,
+            "ply_url": f"/static/exports/{os.path.basename(ply_path)}",
+        }), 200
 
     except Exception as e:
-        print(f"Error generating avatar: {str(e)}")
+        print(f"[create-avatar] Error: {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
-
-
 
 @api.route("/save-avatar", methods=["POST"])
 def save_avatar():
@@ -372,6 +250,40 @@ def save_avatar():
 
     db.session.commit()
     return jsonify({"message": "Customization saved"}), 200
+
+@api.route("/save-avatar-preset", methods=["POST"])
+def save_avatar_preset():
+    try:
+        # Assuming you're getting data from a frontend request
+        data = request.get_json()
+
+        user_id = data["user_id"]
+        height = data["height"]
+        weight = data["weight"]
+        skin_color = data["skin_color"]
+        outfit_color = data["outfit_color"]
+        accessories = data["accessories"]
+
+        # Create a new AvatarPreset instance
+        new_preset = AvatarPreset(
+            user_id=user_id,
+            height=height,
+            weight=weight,
+            skin_color=skin_color,
+            outfit_color=outfit_color,
+            accessories=accessories
+        )
+
+        # Save to the database
+        db.session.add(new_preset)
+        db.session.commit()
+
+        return jsonify({"message": "Preset saved successfully!"}), 200
+
+    except Exception as e:
+        print("[ERROR]", e)
+        return jsonify({"error": "Failed to save preset"}), 500
+
 
 
 @api.route("/delete-avatar/<int:avatar_id>", methods=["DELETE"])
@@ -980,10 +892,10 @@ def export_video():
     output_path = "static/exports/animation.mp4"
 
     # Simulate generation for now
-    clip = VideoFileClip("static/placeholder.mp4")
-    audioclip = AudioFileClip(audio_path)
-    final = clip.set_audio(audioclip)
-    final.write_videofile(output_path, codec="libx264")
+    # clip = VideoFileClip("static/placeholder.mp4")
+    # audioclip = AudioFileClip(audio_path)
+    # final = clip.set_audio(audioclip)
+    # final.write_videofile(output_path, codec="libx264")
 
     return send_file(output_path, as_attachment=True)
 
@@ -1032,18 +944,6 @@ def get_motion_sessions(user_id):
 
 
 # Export video (future)
-
-@api.route("/get-saved-sessions/<int:user_id>", methods=["GET"])
-def get_saved_sessions(user_id):
-    sessions = MotionSession.query.filter_by(user_id=user_id).order_by(MotionSession.created_at.desc()).all()
-    return jsonify([
-        {
-            "id": s.id,
-            "name": s.name,
-            "created_at": s.created_at.isoformat(),
-            "frames": s.frames  # optional: remove this for lighter payload
-        } for s in sessions
-    ])
 
 @api.route("/export-mp4", methods=["POST"])
 def export_mp4():
@@ -1523,6 +1423,134 @@ def export_combined_avatar():
     except Exception as e:
         print("[Export Error]", e)
         return {"error": "Failed to export combined model."}, 500
+
+
+@api.route("/generate-local-avatar", methods=["POST"])
+def generate_local_avatar():
+    image = request.files.get("image")
+    user_id = request.form.get("user_id")
+
+    if not image or not user_id:
+        return jsonify({"error": "Missing image or user ID"}), 400
+
+    filename = secure_filename(image.filename)
+    input_path = os.path.join("uploads", filename)
+    image.save(input_path)
+
+    output_file = selfie_to_avatar(input_path)
+
+    avatar = Avatar(
+        user_id=user_id,
+        avatar_url=f"/{output_file}",
+        filename=os.path.basename(output_file)
+    )
+    db.session.add(avatar)
+    db.session.commit()
+
+    return jsonify({"avatar_url": f"/{output_file}"}), 200
+
+@api.route("/merge-avatar-body", methods=["POST"])
+def merge_avatar_body():
+    data = request.get_json()
+    head_filename = data.get("head_filename")         # safer than full path
+    body_template = data.get("body_template")         # e.g., "slim.glb"
+    user_id = data.get("user_id")
+
+    if not head_filename or not body_template or not user_id:
+        return jsonify({"error": "Missing required fields"}), 400
+
+    head_path = os.path.join("static", "uploads", head_filename)
+    body_path = os.path.join("static", "bodies", body_template)
+
+    if not os.path.exists(head_path):
+        return jsonify({"error": "Head file not found"}), 404
+    if not os.path.exists(body_path):
+        return jsonify({"error": "Body template not found"}), 404
+
+    # Ensure exports folder exists
+    export_folder = os.path.join("static", "exports")
+    os.makedirs(export_folder, exist_ok=True)
+
+    output_filename = f"merged_{uuid.uuid4().hex}.glb"
+    output_path = os.path.join(export_folder, output_filename)
+
+    try:
+        merged_path = merge_head_and_body(head_path, body_path, output_path)
+
+        # Save to DB
+        avatar = Avatar(
+            user_id=user_id,
+            avatar_url="/" + merged_path.replace("\\", "/"),  # normalize Windows paths
+            filename=output_filename
+        )
+        db.session.add(avatar)
+        db.session.commit()
+
+        return jsonify({
+            "message": "Merged avatar created",
+            "avatar_url": "/" + merged_path.replace("\\", "/"),
+            "avatar_id": avatar.id
+        }), 200
+
+    except Exception as e:
+        print(f"[Merge Error] {e}")
+        return jsonify({"error": "Failed to merge avatar"}), 500
+@api.route("/generate-mesh-from-views", methods=["POST"])
+def generate_mesh_from_views_route():
+    try:
+        files = request.files
+        required_views = ['front', 'left', 'right']
+
+        for view in required_views:
+            if view not in files:
+                return jsonify({"error": f"Missing view: {view}"}), 400
+
+        # Save each view file
+        filenames = {}
+        for view in required_views:
+            file = files[view]
+            filename = f"{view}_{uuid.uuid4().hex}_{secure_filename(file.filename)}"
+            save_path = os.path.join(UPLOAD_FOLDER, filename)
+            file.save(save_path)
+            filenames[view] = save_path
+
+        # Generate mesh
+        output_path = generate_mesh_from_views(
+            front_path=filenames['front'],
+            left_path=filenames['left'],
+            right_path=filenames['right'],
+            output_dir=OUTPUT_FOLDER
+        )
+
+        return jsonify({
+            "message": "✅ 3D mesh generated from multiple views",
+            "mesh_url": "/" + output_path.replace("\\", "/")
+        })
+
+    except Exception as e:
+        print("[❌ ERROR]", str(e))
+        return jsonify({"error": "Failed to generate mesh"}), 500
+    
+@api.route('/save-avatar-customization', methods=['POST'])
+@jwt_required()
+def save_avatar_customization():
+    user_id = get_jwt_identity()
+    data = request.get_json()
+
+    new_avatar = Avatar(
+        user_id=user_id,
+        skin_color=data.get('skin_color'),
+        outfit_color=data.get('outfit_color'),
+        height=data.get('height'),
+        weight=data.get('weight'),
+        accessories=data.get('accessories'),
+        model_url=data.get('model_url'),
+        selfie_url=data.get('selfie_url')  # optional
+    )
+    db.session.add(new_avatar)
+    db.session.commit()
+
+    return jsonify({"message": "Avatar customization saved", "avatar_id": new_avatar.id}), 200
 
 
 if __name__ == "__main__":

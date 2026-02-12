@@ -1,4 +1,5 @@
 from flask_sqlalchemy import SQLAlchemy
+
 from datetime import datetime
 
 db = SQLAlchemy()
@@ -248,4 +249,17 @@ class Outfit(db.Model):
             "created_at": self.created_at.isoformat()
         }
     
-
+class AvatarPreset(db.Model):
+    __tablename__ = 'avatar_presets'  # Name of the table in the database
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, nullable=False)  # Foreign key to User model (if applicable)
+    height = db.Column(db.Integer)  # Avatar height (cm)
+    weight = db.Column(db.Integer)  # Avatar weight (kg)
+    skin_color = db.Column(db.String(7))  # Skin color in hex format
+    outfit_color = db.Column(db.String(7))  # Outfit color in hex format
+    accessories = db.Column(db.String(50))  # Accessories (e.g., glasses, hat)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)  # Timestamp for when the preset was created
+    
+    def __repr__(self):
+        return f"<AvatarPreset {self.id} - User {self.user_id}>"

@@ -1,7 +1,7 @@
 // src/front/js/pages/MyOutfitsPage.js
 import React, { useEffect, useState, useContext } from "react";
 import { Context } from "../store/appContext";
-import {AvatarPreview} from "../component/AvatarPreview";
+import AvatarPreview from "../component/AvatarPreview";
 import { useNavigate } from "react-router-dom";
 
 const MyOutfitsPage = () => {

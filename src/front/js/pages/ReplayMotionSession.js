@@ -1,233 +1,334 @@
-// src/pages/ReplayMotionSession.js
+// src/front/js/pages/ReplayMotionSession.js
+// Fixed version using proper imports
+
 import React, { useEffect, useRef, useState } from 'react';
-import * as THREE from 'three';
-import { Canvas, useFrame } from '@react-three/fiber';
-// import { OrbitControls, useGLTF, XR, VRCanvas, Controllers } from '@react-three/drei';
-import { OrbitControls } from '@react-three/drei';
-
-import { Line } from 'react-chartjs-2';
-import { Chart, TimeScale, LineElement, PointElement, LinearScale } from 'chart.js';
-import 'chartjs-adapter-date-fns';
-
-Chart.register(TimeScale, LineElement, PointElement, LinearScale);
-
-const POSE_BONE_MAP = {
-  11: 'LeftShoulder', 12: 'RightShoulder', 13: 'LeftUpperArm', 14: 'RightUpperArm',
-  15: 'LeftLowerArm', 16: 'RightLowerArm', 23: 'LeftUpperLeg', 24: 'RightUpperLeg',
-  25: 'LeftLowerLeg', 26: 'RightLowerLeg', 27: 'LeftFoot', 28: 'RightFoot',
-  0: 'Head', 9: 'LeftEye', 10: 'RightEye', 19: 'LeftHand', 20: 'RightHand',
-  31: 'LeftFinger', 32: 'RightFinger', 33: 'Mouth', 34: 'Jaw'
-};
-
-function Avatar({ frames, currentTime, modelUrl, phoneme }) {
-  const { scene } = useGLTF(modelUrl);
-
-  useFrame(() => {
-    if (!frames || frames.length === 0) return;
-    const currentFrame = frames.find((f) => Math.abs(f.time - currentTime) < 0.03);
-    if (!currentFrame) return;
-
-    Object.entries(POSE_BONE_MAP).forEach(([index, boneName]) => {
-      const bone = scene.getObjectByName(boneName);
-      const lm = currentFrame.landmarks[index];
-      if (bone && lm) {
-        bone.position.set(lm.x, lm.y, lm.z);
-      }
-    });
-
-    const mouth = scene.getObjectByName('Mouth');
-    if (mouth && phoneme) {
-      mouth.scale.y = 1 + Math.random() * 0.5;
-    }
-  });
-
-  return <primitive object={scene} scale={1.2} />;
-}
+import { useParams } from 'react-router-dom';
+import AvatarRigPlayer3D from '../component/AvatarRigPlayer3D';
 
 const ReplayMotionSession = () => {
+  const { id: sessionId } = useParams();
   const [frames, setFrames] = useState([]);
-  const [currentTime, setCurrentTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioFile, setAudioFile] = useState(null);
-  const [poseFile, setPoseFile] = useState(null);
-  const [beatTimes, setBeatTimes] = useState([]);
-  const [phoneme, setPhoneme] = useState(null);
-  const [modelUrl, setModelUrl] = useState('/rigged-avatar.glb');
-  const [availableModels] = useState([
-    '/rigged-avatar.glb', '/alt-avatar.glb', '/dancer-avatar.glb'
-  ]);
+  const [audioUrl, setAudioUrl] = useState(null);
+  const [modelUrl, setModelUrl] = useState('/models/avatar.glb');
+  const [playbackSpeed, setPlaybackSpeed] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   const audioRef = useRef(new Audio());
-  const startTimeRef = useRef();
-  const requestRef = useRef();
-  const mediaRecorderRef = useRef();
-  const recordedChunks = useRef([]);
 
-  const animate = (timestamp) => {
-    if (!startTimeRef.current) startTimeRef.current = timestamp;
-    const elapsed = (timestamp - startTimeRef.current) / 1000;
-    setCurrentTime(elapsed);
+  const availableModels = [
+    { name: 'Default Avatar', url: '/models/avatar.glb' },
+    { name: 'Rigged Avatar', url: '/rigged-avatar.glb' },
+    { name: 'Alternate Avatar', url: '/alt-avatar.glb' },
+  ];
 
-    const isOnBeat = beatTimes.some((t) => Math.abs(t - elapsed) < 0.05);
-    if (isOnBeat) {
-      console.log('💥 FX at beat', elapsed);
-      // TODO: Trigger FX timeline items here (e.g., particles, lighting)
+  // Load session from backend if sessionId provided
+  useEffect(() => {
+    if (sessionId) {
+      loadSessionFromBackend(sessionId);
     }
+  }, [sessionId]);
 
-    requestRef.current = requestAnimationFrame(animate);
+  const loadSessionFromBackend = async (id) => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/motion-sessions/${id}`);
+      if (!res.ok) throw new Error('Session not found');
+      
+      const data = await res.json();
+      setFrames(data.frames || []);
+      
+      if (data.audio_url) {
+        setAudioUrl(data.audio_url);
+        audioRef.current.src = data.audio_url;
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handlePlay = () => {
-    if (!frames.length) return;
-    setIsPlaying(true);
-    startTimeRef.current = null;
-    audioRef.current.currentTime = 0;
-    audioRef.current.play();
-    requestRef.current = requestAnimationFrame(animate);
+  // Handle JSON file upload
+  const handlePoseUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
 
-    const canvasStream = document.querySelector('canvas')?.captureStream();
-    if (canvasStream) {
-      mediaRecorderRef.current = new MediaRecorder(canvasStream, { mimeType: 'video/webm' });
-      mediaRecorderRef.current.ondataavailable = (e) => recordedChunks.current.push(e.data);
-      mediaRecorderRef.current.onstop = () => {
-        const blob = new Blob(recordedChunks.current, { type: 'video/webm' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'session-recording.webm';
-        a.click();
-        recordedChunks.current = [];
-      };
-      mediaRecorderRef.current.start();
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const data = JSON.parse(evt.target.result);
+        // Handle both array format and object with frames property
+        const frameData = Array.isArray(data) ? data : data.frames || [];
+        setFrames(frameData);
+        setError(null);
+      } catch (err) {
+        setError('Invalid JSON file');
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  // Handle audio file upload
+  const handleAudioUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setAudioFile(file);
+    const url = URL.createObjectURL(file);
+    setAudioUrl(url);
+    audioRef.current.src = url;
+  };
+
+  // Handle custom avatar upload
+  const handleAvatarUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const url = URL.createObjectURL(file);
+    setModelUrl(url);
+  };
+
+  // Play/Pause controls
+  const handlePlay = () => {
+    setIsPlaying(true);
+    if (audioUrl) {
+      audioRef.current.currentTime = 0;
+      audioRef.current.playbackRate = playbackSpeed;
+      audioRef.current.play();
     }
   };
 
   const handlePause = () => {
     setIsPlaying(false);
-    audioRef.current.pause();
-    cancelAnimationFrame(requestRef.current);
-    mediaRecorderRef.current?.stop();
+    if (audioUrl) {
+      audioRef.current.pause();
+    }
   };
 
-  const handlePoseUpload = (e) => {
-    const file = e.target.files[0];
-    setPoseFile(file);
-    const reader = new FileReader();
-    reader.onload = (evt) => setFrames(JSON.parse(evt.target.result));
-    reader.readAsText(file);
+  const handleStop = () => {
+    setIsPlaying(false);
+    if (audioUrl) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
   };
 
-  const handleAudioUpload = (e) => {
-    const file = e.target.files[0];
-    setAudioFile(file);
-    const audioURL = URL.createObjectURL(file);
-    audioRef.current.src = audioURL;
-  };
-
-  const handleExport = async (format) => {
-    const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/export-${format}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ frames })
-    });
-    const blob = await res.blob();
+  // Export functions
+  const handleExportJSON = () => {
+    const json = JSON.stringify(frames, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `animation.${format}`;
+    a.download = `motion_session_${Date.now()}.json`;
     a.click();
   };
 
-  const loadBeatMap = async () => {
-    const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/get-beat-map/1`);
-    const data = await res.json();
-    if (data.length > 0) setBeatTimes(data[0].beat_timestamps);
-  };
-
-  const saveSessionToProfile = async () => {
-    await fetch(`${process.env.REACT_APP_BACKEND_URL}/save-motion-session`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: 1, frames })
-    });
-    alert('Session saved to profile!');
-  };
-
-  useEffect(() => {
-    loadBeatMap();
-
-    const recognizer = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-    recognizer.continuous = true;
-    recognizer.interimResults = true;
-    recognizer.onresult = (event) => {
-      const transcript = event.results[event.results.length - 1][0].transcript;
-      const lastChar = transcript.slice(-1).toLowerCase();
-      setPhoneme(lastChar);
-    };
-    recognizer.start();
-
-    return () => recognizer.stop();
-  }, []);
+  // Calculate session stats
+  const sessionDuration = frames.length > 0 
+    ? (frames[frames.length - 1]?.time || 0).toFixed(2) 
+    : 0;
 
   return (
-    <div className="container-fluid">
-      <h2 className="text-center">🎥 Replay Motion Session in VR</h2>
+    <div className="container-fluid mt-4">
+      <h2>▶️ Replay Motion Session</h2>
 
-      <div className="mb-3 d-flex gap-3">
-        <input type="file" accept=".json" onChange={handlePoseUpload} />
-        <input type="file" accept="audio/*" onChange={handleAudioUpload} />
-        <select onChange={(e) => setModelUrl(e.target.value)} value={modelUrl}>
-          {availableModels.map((url) => <option key={url} value={url}>{url}</option>)}
-        </select>
-        <button className="btn btn-primary" onClick={isPlaying ? handlePause : handlePlay}>
-          {isPlaying ? 'Pause' : 'Play'}
-        </button>
-        <button className="btn btn-success" onClick={saveSessionToProfile}>💾 Save to Profile</button>
-        <button className="btn btn-secondary" onClick={() => handleExport('fbx')}>Export FBX</button>
-        <button className="btn btn-secondary" onClick={() => handleExport('glb')}>Export GLB</button>
-        <p className="mt-2">Time: {currentTime.toFixed(2)}s</p>
+      {/* Error Display */}
+      {error && (
+        <div className="alert alert-danger">{error}</div>
+      )}
+
+      {/* Loading */}
+      {loading && (
+        <div className="alert alert-info">Loading session...</div>
+      )}
+
+      {/* File Inputs Row */}
+      <div className="row mb-4">
+        <div className="col-md-4">
+          <label className="form-label">Load Pose Data (JSON):</label>
+          <input
+            type="file"
+            className="form-control"
+            accept=".json"
+            onChange={handlePoseUpload}
+          />
+        </div>
+
+        <div className="col-md-4">
+          <label className="form-label">Audio Track (optional):</label>
+          <input
+            type="file"
+            className="form-control"
+            accept="audio/*"
+            onChange={handleAudioUpload}
+          />
+        </div>
+
+        <div className="col-md-4">
+          <label className="form-label">Custom Avatar (GLB):</label>
+          <input
+            type="file"
+            className="form-control"
+            accept=".glb,.gltf"
+            onChange={handleAvatarUpload}
+          />
+        </div>
       </div>
 
-      <VRCanvas camera={{ position: [0, 2, 5] }} style={{ height: '400px' }}>
-        <XR>
-          <ambientLight intensity={0.5} />
-          <directionalLight position={[5, 10, 5]} intensity={1} />
-          <OrbitControls />
-          <Controllers />
-          {frames.length > 0 && <Avatar frames={frames} currentTime={currentTime} modelUrl={modelUrl} phoneme={phoneme} />}
-        </XR>
-      </VRCanvas>
+      {/* Avatar Model Selection */}
+      <div className="row mb-3">
+        <div className="col-md-4">
+          <label className="form-label">Select Avatar:</label>
+          <select
+            className="form-select"
+            value={modelUrl}
+            onChange={(e) => setModelUrl(e.target.value)}
+          >
+            {availableModels.map((model) => (
+              <option key={model.url} value={model.url}>
+                {model.name}
+              </option>
+            ))}
+          </select>
+        </div>
 
-      <Line
-        data={{
-          labels: frames.map((f) => new Date(f.time * 1000)),
-          datasets: [
-            {
-              label: 'Pose Frames',
-              data: frames.map((f) => ({ x: f.time * 1000, y: 0 })),
-              borderColor: '#888',
-              pointRadius: 3,
-            },
-            {
-              label: 'Beats',
-              data: beatTimes.map((t) => ({ x: t * 1000, y: 0 })),
-              backgroundColor: 'red',
-              pointRadius: 5,
-              showLine: false,
-            },
-          ],
-        }}
-        options={{
-          scales: {
-            x: {
-              type: 'time',
-              time: { unit: 'second' },
-              title: { display: true, text: 'Time' },
-            },
-            y: { display: false },
-          },
-        }}
-      />
+        <div className="col-md-4">
+          <label className="form-label">Playback Speed:</label>
+          <select
+            className="form-select"
+            value={playbackSpeed}
+            onChange={(e) => {
+              const speed = parseFloat(e.target.value);
+              setPlaybackSpeed(speed);
+              audioRef.current.playbackRate = speed;
+            }}
+          >
+            <option value="0.25">0.25x (Slow)</option>
+            <option value="0.5">0.5x</option>
+            <option value="0.75">0.75x</option>
+            <option value="1">1x (Normal)</option>
+            <option value="1.5">1.5x</option>
+            <option value="2">2x (Fast)</option>
+          </select>
+        </div>
+
+        <div className="col-md-4 d-flex align-items-end">
+          <div className="text-muted">
+            <strong>Frames:</strong> {frames.length} | 
+            <strong> Duration:</strong> {sessionDuration}s
+          </div>
+        </div>
+      </div>
+
+      {/* Playback Controls */}
+      <div className="mb-4 d-flex gap-2 flex-wrap align-items-center">
+        {!isPlaying ? (
+          <button
+            className="btn btn-success"
+            onClick={handlePlay}
+            disabled={frames.length === 0}
+          >
+            ▶️ Play
+          </button>
+        ) : (
+          <button className="btn btn-warning" onClick={handlePause}>
+            ⏸️ Pause
+          </button>
+        )}
+
+        <button
+          className="btn btn-secondary"
+          onClick={handleStop}
+          disabled={frames.length === 0}
+        >
+          ⏹️ Stop
+        </button>
+
+        <button
+          className="btn btn-primary"
+          onClick={handleExportJSON}
+          disabled={frames.length === 0}
+        >
+          💾 Export JSON
+        </button>
+
+        {audioUrl && (
+          <span className="badge bg-info">🎵 Audio loaded</span>
+        )}
+      </div>
+
+      {/* 3D Player */}
+      <div className="card">
+        <div className="card-body p-0">
+          {frames.length > 0 ? (
+            <AvatarRigPlayer3D
+              recordedFrames={frames}
+              avatarUrl={modelUrl}
+              isPlaying={isPlaying}
+              playbackSpeed={playbackSpeed}
+              showControls={false}
+              height="500px"
+            />
+          ) : (
+            <div 
+              className="d-flex align-items-center justify-content-center bg-light"
+              style={{ height: '500px' }}
+            >
+              <div className="text-center text-muted">
+                <h4>No Motion Data Loaded</h4>
+                <p>Upload a JSON file or load a saved session to begin playback</p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Audio Player (hidden but functional) */}
+      <audio ref={audioRef} style={{ display: 'none' }} />
+
+      {/* Session Info */}
+      {frames.length > 0 && (
+        <div className="card mt-4">
+          <div className="card-header">
+            <h5 className="mb-0">📊 Session Info</h5>
+          </div>
+          <div className="card-body">
+            <div className="row">
+              <div className="col-md-3">
+                <strong>Total Frames:</strong> {frames.length}
+              </div>
+              <div className="col-md-3">
+                <strong>Duration:</strong> {sessionDuration} seconds
+              </div>
+              <div className="col-md-3">
+                <strong>Avg FPS:</strong> {(frames.length / sessionDuration).toFixed(1)}
+              </div>
+              <div className="col-md-3">
+                <strong>First Frame:</strong> {frames[0]?.time?.toFixed(3)}s
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Links */}
+      <div className="mt-4 d-flex gap-2 flex-wrap">
+        <a href="/motion" className="btn btn-outline-primary">
+          🎥 Live Capture
+        </a>
+        <a href="/motion-sessions" className="btn btn-outline-secondary">
+          📂 All Sessions
+        </a>
+        <a href="/dance-sync" className="btn btn-outline-success">
+          🎵 Dance Sync
+        </a>
+      </div>
     </div>
   );
 };

@@ -1,11 +1,8 @@
 # /workspaces/kiosk/src/utils/video.py
 
 import os
-
-from moviepy import AudioFileClip, VideoFileClip
-from moviepy.video.io.ffmpeg_tools import ffmpeg_extract_subclip
-from PIL import Image  # Add this for image handling
-
+from moviepy.editor import VideoFileClip  # ✅ Make sure this is uncommented
+from PIL import Image  # For saving frames
 
 def generate_frame_images(video_path, output_folder="static/frames"):
     """

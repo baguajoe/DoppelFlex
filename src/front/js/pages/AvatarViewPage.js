@@ -1,14 +1,19 @@
 // UploadPage.js
 import React, { useState } from 'react';
-import AvatarCreation from '../component/AvatarCreation';
-import AvatarViewer from '../component/AvatarViewer';
+import ModelViewer from "../component/ModelViewer";
 
 
-const AvatarViewPage = ({ avatarUrl }) => (
-  <div>
-    <h2>Your Avatar</h2>
-    <AvatarViewer modelUrl={avatarUrl} />
-  </div>
-);
+const AvatarViewPage = ({ avatarUrl, skinColor = "#f5cba7" }) => {
+  return (
+    <div className="container mt-4">
+      <h2>Your Avatar Preview</h2>
+      {avatarUrl ? (
+        <ModelViewer url={avatarUrl} skinColor={skinColor} />
+      ) : (
+        <p>No avatar to preview.</p>
+      )}
+    </div>
+  );
+};
 
 export default AvatarViewPage;
