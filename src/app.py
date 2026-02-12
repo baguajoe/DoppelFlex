@@ -92,7 +92,7 @@ def serve_react_fallback(path):
 
 @app.route('/static/uploads/<filename>')
 def serve_uploaded_file(filename):
-    return send_from_directory('static/uploads', filename)
+    return send_from_directory('../static/uploads', filename)
 
 if __name__ == '__main__':
     PORT = int(os.environ.get('PORT', 3001))

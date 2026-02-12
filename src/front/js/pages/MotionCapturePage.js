@@ -5,16 +5,19 @@ import React, { useState, useCallback } from 'react';
 import LiveMoCapAvatar from '../component/LiveMoCapAvatar';
 
 const MotionCapturePage = () => {
-  const [avatarUrl, setAvatarUrl] = useState('/models/avatar.glb');
+  // Use backend URL for static files
+  const backendUrl = process.env.REACT_APP_BACKEND_URL || '';
+  const defaultAvatar = `${backendUrl}/static/uploads/me_wit_locks.jpg_avatar.glb`;
+  
+  const [avatarUrl, setAvatarUrl] = useState(defaultAvatar);
   const [showVideo, setShowVideo] = useState(true);
   const [saveStatus, setSaveStatus] = useState('');
   const [lastFrameData, setLastFrameData] = useState(null);
 
   // Available avatar models
   const avatarModels = [
-    { name: 'Default Avatar', url: '/models/avatar.glb' },
-    { name: 'Rigged Avatar', url: '/rigged-avatar.glb' },
-    { name: 'Alternate Avatar', url: '/alt-avatar.glb' },
+    { name: 'Default Avatar', url: `${backendUrl}/static/uploads/me_wit_locks.jpg_avatar.glb` },
+    { name: 'Rigged Avatar', url: `${backendUrl}/static/models/avatar.glb` },
   ];
 
   // Handle each frame (optional - for sending to backend)
@@ -34,7 +37,7 @@ const MotionCapturePage = () => {
     try {
       const userId = localStorage.getItem('user_id') || '1';
       
-      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/save-motion-session`, {
+      const response = await fetch(`${backendUrl}/save-motion-session`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -193,7 +196,7 @@ const MotionCapturePage = () => {
         <a href="/motion-sessions" className="btn btn-outline-primary">
           📂 View Saved Sessions
         </a>
-        <a href="/replay" className="btn btn-outline-secondary">
+        <a href="/replay-session" className="btn btn-outline-secondary">
           ▶️ Replay Sessions
         </a>
         <a href="/dance-sync" className="btn btn-outline-success">

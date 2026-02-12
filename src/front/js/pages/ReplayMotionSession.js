@@ -1,5 +1,5 @@
 // src/front/js/pages/ReplayMotionSession.js
-// Fixed version using proper imports
+// Fixed version using proper imports and correct avatar paths
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
@@ -7,11 +7,13 @@ import AvatarRigPlayer3D from '../component/AvatarRigPlayer3D';
 
 const ReplayMotionSession = () => {
   const { id: sessionId } = useParams();
+  const backendUrl = process.env.REACT_APP_BACKEND_URL || '';
+  
   const [frames, setFrames] = useState([]);
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioFile, setAudioFile] = useState(null);
   const [audioUrl, setAudioUrl] = useState(null);
-  const [modelUrl, setModelUrl] = useState('/models/avatar.glb');
+  const [modelUrl, setModelUrl] = useState(`${backendUrl}/static/uploads/me_wit_locks.jpg_avatar.glb`);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -19,9 +21,8 @@ const ReplayMotionSession = () => {
   const audioRef = useRef(new Audio());
 
   const availableModels = [
-    { name: 'Default Avatar', url: '/models/avatar.glb' },
-    { name: 'Rigged Avatar', url: '/rigged-avatar.glb' },
-    { name: 'Alternate Avatar', url: '/alt-avatar.glb' },
+    { name: 'Default Avatar', url: `${backendUrl}/static/uploads/me_wit_locks.jpg_avatar.glb` },
+    { name: 'Rigged Avatar', url: `${backendUrl}/static/models/avatar.glb` },
   ];
 
   // Load session from backend if sessionId provided
@@ -36,7 +37,7 @@ const ReplayMotionSession = () => {
     setError(null);
 
     try {
-      const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/motion-sessions/${id}`);
+      const res = await fetch(`${backendUrl}/motion-sessions/${id}`);
       if (!res.ok) throw new Error('Session not found');
       
       const data = await res.json();

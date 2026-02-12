@@ -5,7 +5,16 @@ import React, { useState } from 'react';
 import LiveMoCapAvatar from '../component/LiveMoCapAvatar';
 
 const LiveAvatarPage = () => {
-  const [avatarUrl, setAvatarUrl] = useState('/models/avatar.glb');
+  // Use backend URL for static files
+  const backendUrl = process.env.REACT_APP_BACKEND_URL || '';
+  const defaultAvatar = `${backendUrl}/static/uploads/me_wit_locks.jpg_avatar.glb`;
+  
+  const [avatarUrl, setAvatarUrl] = useState(defaultAvatar);
+
+  const avatarOptions = [
+    { name: 'Default Avatar', url: `${backendUrl}/static/uploads/me_wit_locks.jpg_avatar.glb` },
+    { name: 'Rigged Avatar', url: `${backendUrl}/static/models/avatar.glb` },
+  ];
 
   return (
     <div className="container mt-4">
@@ -20,9 +29,9 @@ const LiveAvatarPage = () => {
           value={avatarUrl}
           onChange={(e) => setAvatarUrl(e.target.value)}
         >
-          <option value="/models/avatar.glb">Default Avatar</option>
-          <option value="/rigged-avatar.glb">Rigged Avatar</option>
-          <option value="/alt-avatar.glb">Alternate Avatar</option>
+          {avatarOptions.map((opt) => (
+            <option key={opt.url} value={opt.url}>{opt.name}</option>
+          ))}
         </select>
       </div>
 

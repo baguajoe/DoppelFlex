@@ -201,12 +201,16 @@ const AvatarRig = ({ recordedFrames, avatarUrl, isPlaying = true, playbackSpeed 
  */
 const AvatarRigPlayer3D = ({ 
   recordedFrames, 
-  avatarUrl = '/rigged-avatar.glb',
+  avatarUrl,
   isPlaying = true,
   playbackSpeed = 1,
   showControls = true,
   height = '500px',
 }) => {
+  // Use backend URL for default avatar
+  const backendUrl = process.env.REACT_APP_BACKEND_URL || '';
+  const defaultAvatarUrl = avatarUrl || `${backendUrl}/static/uploads/me_wit_locks.jpg_avatar.glb`;
+  
   const [localIsPlaying, setLocalIsPlaying] = useState(isPlaying);
   const [localSpeed, setLocalSpeed] = useState(playbackSpeed);
 
@@ -249,7 +253,7 @@ const AvatarRigPlayer3D = ({
         {recordedFrames && recordedFrames.length > 0 && (
           <AvatarRig 
             recordedFrames={recordedFrames} 
-            avatarUrl={avatarUrl}
+            avatarUrl={defaultAvatarUrl}
             isPlaying={localIsPlaying}
             playbackSpeed={localSpeed}
           />

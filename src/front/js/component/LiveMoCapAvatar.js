@@ -145,11 +145,15 @@ const LiveAvatar = ({ landmarks, avatarUrl }) => {
  * Main Live MoCap component
  */
 const LiveMoCapAvatar = ({
-  avatarUrl = '/models/avatar.glb',
+  avatarUrl,
   onFrame = null,
   showVideo = true,
   videoWidth = 320,
 }) => {
+  // Use backend URL for default avatar
+  const backendUrl = process.env.REACT_APP_BACKEND_URL || '';
+  const defaultAvatarUrl = avatarUrl || `${backendUrl}/static/uploads/me_wit_locks.jpg_avatar.glb`;
+  
   const videoRef = useRef(null);
   const [landmarks, setLandmarks] = useState(null);
   const [prevLandmarks, setPrevLandmarks] = useState(null);
@@ -372,7 +376,7 @@ const LiveMoCapAvatar = ({
             <directionalLight position={[5, 10, 5]} intensity={1} />
             <directionalLight position={[-5, 5, -5]} intensity={0.3} />
             
-            <LiveAvatar landmarks={landmarks} avatarUrl={avatarUrl} />
+            <LiveAvatar landmarks={landmarks} avatarUrl={defaultAvatarUrl} />
             
             <OrbitControls enablePan={true} enableZoom={true} />
             
