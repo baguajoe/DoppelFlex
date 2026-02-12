@@ -1,26 +1,25 @@
-//import react into the bundle
-import React from "react";
-import ReactDOM from "react-dom";
+// src/front/js/index.js
+import React from 'react';
+import ReactDOM from 'react-dom';
+import Layout from './layout';
 
-//include your index.scss file into the bundle
-import "../styles/index.css";
+// Styles
+import '../styles/theme.css';
+import '../styles/index.css';
+import '../styles/variables.css';
 
-//import your own components
-import Layout from "./layout";
+// Check if using React 18 or older
+const container = document.getElementById('root') || document.getElementById('app');
 
-//render your react application
-ReactDOM.render(<Layout />, document.querySelector("#app"));
-
-// import React from "react";
-// import { createRoot } from "react-dom/client";
-// import "../styles/index.css";
-
-// import Layout from "./layout";
-// import injectContext from "./store/flux";
-
-// const LayoutWithContext = injectContext(Layout);
-
-// const root = createRoot(document.querySelector("#app"));
-// root.render(<LayoutWithContext />);
-
-  
+if (container) {
+  // Try React 18 first
+  if (ReactDOM.createRoot) {
+    const root = ReactDOM.createRoot(container);
+    root.render(<Layout />);
+  } else {
+    // Fallback for React 17
+    ReactDOM.render(<Layout />, container);
+  }
+} else {
+  console.error('No root element found! Looking for #root or #app');
+}

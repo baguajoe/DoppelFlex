@@ -1,0 +1,91 @@
+/* src/front/styles/variables.css */
+/* DoppelFlex Design System Variables */
+
+:root {
+  /* ─── Layout ─── */
+  --df-navbar-height: 60px;
+  --df-sidebar-width: 240px;
+  --df-sidebar-collapsed: 60px;
+  
+  /* ─── Colors - Primary ─── */
+  --df-primary: #7c6aef;
+  --df-primary-light: #9d8df7;
+  --df-primary-dark: #5a4ad4;
+  --df-primary-glow: rgba(124, 106, 239, 0.15);
+  
+  /* ─── Colors - Accent ─── */
+  --df-accent: #00e5c3;
+  --df-accent-light: #33ebd0;
+  --df-accent-dark: #00b89c;
+  
+  /* ─── Colors - Status ─── */
+  --df-success: #00e676;
+  --df-warning: #ffab00;
+  --df-error: #ff5c72;
+  --df-info: #00b0ff;
+  
+  /* ─── Colors - Background ─── */
+  --df-bg-base: #0a0a12;
+  --df-bg-elevated: #12121c;
+  --df-bg-surface: #1a1a28;
+  --df-bg-overlay: rgba(15, 15, 25, 0.95);
+  --df-bg-card: rgba(255, 255, 255, 0.03);
+  
+  /* ─── Colors - Border ─── */
+  --df-border: rgba(255, 255, 255, 0.08);
+  --df-border-light: rgba(255, 255, 255, 0.12);
+  --df-border-focus: rgba(124, 106, 239, 0.5);
+  
+  /* ─── Colors - Text ─── */
+  --df-text-primary: #ffffff;
+  --df-text-secondary: #a0a0b0;
+  --df-text-muted: #606070;
+  --df-text-disabled: #404050;
+  
+  /* ─── Typography ─── */
+  --df-font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --df-font-heading: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --df-font-mono: 'Fira Code', 'Monaco', 'Consolas', monospace;
+  
+  /* ─── Spacing ─── */
+  --df-space-xs: 4px;
+  --df-space-sm: 8px;
+  --df-space-md: 16px;
+  --df-space-lg: 24px;
+  --df-space-xl: 32px;
+  --df-space-2xl: 48px;
+  
+  /* ─── Border Radius ─── */
+  --df-radius-xs: 4px;
+  --df-radius-sm: 6px;
+  --df-radius-md: 10px;
+  --df-radius-lg: 14px;
+  --df-radius-xl: 20px;
+  --df-radius-pill: 50px;
+  --df-radius-circle: 50%;
+  
+  /* ─── Shadows ─── */
+  --df-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.2);
+  --df-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.25);
+  --df-shadow-lg: 0 10px 40px rgba(0, 0, 0, 0.4);
+  --df-shadow-glow: 0 0 20px rgba(124, 106, 239, 0.3);
+  
+  /* ─── Transitions ─── */
+  --df-transition-fast: 0.15s ease;
+  --df-transition-base: 0.25s ease;
+  --df-transition-slow: 0.4s ease;
+  
+  /* ─── Z-Index ─── */
+  --df-z-dropdown: 100;
+  --df-z-sticky: 200;
+  --df-z-modal: 300;
+  --df-z-tooltip: 400;
+  --df-z-toast: 500;
+}
+
+/* Dark mode is default, but we can add light mode later */
+@media (prefers-color-scheme: light) {
+  :root {
+    /* Override for light mode if needed */
+  }
+}

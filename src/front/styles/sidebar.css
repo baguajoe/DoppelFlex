@@ -1,0 +1,260 @@
+/* ─── Sidebar ─── */
+.df-sidebar {
+  position: sticky;
+  top: var(--df-navbar-height);
+  height: calc(100vh - var(--df-navbar-height));
+  width: var(--df-sidebar-width);
+  min-width: var(--df-sidebar-width);
+  background: var(--df-bg-base);
+  border-right: 1px solid var(--df-border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+  transition: width var(--df-transition-base), min-width var(--df-transition-base);
+  z-index: 50;
+}
+
+.df-sidebar.collapsed {
+  width: var(--df-sidebar-collapsed);
+  min-width: var(--df-sidebar-collapsed);
+}
+
+
+/* ─── Toggle Button ─── */
+.df-sidebar-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: var(--df-space-md) var(--df-space-md) var(--df-space-sm);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--df-text-muted);
+  transition: color var(--df-transition-fast);
+}
+
+.df-sidebar-toggle:hover {
+  color: var(--df-text-secondary);
+}
+
+.df-sidebar-toggle-icon {
+  transition: transform var(--df-transition-base);
+}
+
+.df-sidebar-toggle-icon.flipped {
+  transform: rotate(180deg);
+}
+
+
+/* ─── Nav Sections ─── */
+.df-sidebar-nav {
+  flex: 1;
+  padding: var(--df-space-sm) var(--df-space-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--df-space-xs);
+}
+
+.df-sidebar-section {
+  margin-bottom: var(--df-space-xs);
+}
+
+.df-sidebar-section-header {
+  display: flex;
+  align-items: center;
+  gap: var(--df-space-sm);
+  width: 100%;
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  border-radius: var(--df-radius-sm);
+  cursor: pointer;
+  color: var(--df-text-muted);
+  font-family: var(--df-font-body);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  transition: 
+    color var(--df-transition-fast),
+    background var(--df-transition-fast);
+}
+
+.df-sidebar-section-header:hover {
+  color: var(--df-text-secondary);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.df-sidebar-section-header.open {
+  color: var(--df-text-secondary);
+}
+
+.df-sidebar-section-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+
+.df-sidebar-section-header:hover .df-sidebar-section-icon,
+.df-sidebar-section-header.open .df-sidebar-section-icon {
+  opacity: 0.9;
+}
+
+.df-sidebar-section-label {
+  flex: 1;
+  text-align: left;
+}
+
+.df-sidebar-section-chevron {
+  transition: transform var(--df-transition-fast);
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+
+.df-sidebar-section-chevron.open {
+  transform: rotate(180deg);
+}
+
+
+/* ─── Links ─── */
+.df-sidebar-links {
+  padding: var(--df-space-xs) 0 var(--df-space-xs) 0;
+  animation: df-sidebar-expand 0.2s ease;
+}
+
+@keyframes df-sidebar-expand {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.df-sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: var(--df-space-sm);
+  padding: 7px 12px 7px 40px;
+  font-size: 0.85rem;
+  font-weight: 450;
+  color: var(--df-text-secondary);
+  text-decoration: none;
+  border-radius: var(--df-radius-sm);
+  transition: 
+    color var(--df-transition-fast),
+    background var(--df-transition-fast);
+  position: relative;
+}
+
+.df-sidebar-link:hover {
+  color: var(--df-text-primary);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.df-sidebar-link-indicator {
+  position: absolute;
+  left: 20px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--df-text-muted);
+  transition: all var(--df-transition-fast);
+}
+
+.df-sidebar-link:hover .df-sidebar-link-indicator {
+  background: var(--df-text-secondary);
+}
+
+.df-sidebar-link.active {
+  color: var(--df-primary-light);
+  background: var(--df-primary-glow);
+}
+
+.df-sidebar-link.active .df-sidebar-link-indicator {
+  width: 4px;
+  height: 16px;
+  border-radius: 2px;
+  background: var(--df-primary);
+  left: 18px;
+}
+
+
+/* ─── Footer / Upgrade CTA ─── */
+.df-sidebar-footer {
+  padding: var(--df-space-md);
+  border-top: 1px solid var(--df-border);
+}
+
+.df-sidebar-upgrade {
+  display: flex;
+  align-items: center;
+  gap: var(--df-space-sm);
+  padding: 12px;
+  background: linear-gradient(135deg, rgba(124, 106, 239, 0.1), rgba(0, 229, 195, 0.08));
+  border: 1px solid rgba(124, 106, 239, 0.15);
+  border-radius: var(--df-radius-md);
+  text-decoration: none;
+  transition: 
+    border-color var(--df-transition-fast),
+    background var(--df-transition-fast);
+}
+
+.df-sidebar-upgrade:hover {
+  background: linear-gradient(135deg, rgba(124, 106, 239, 0.15), rgba(0, 229, 195, 0.12));
+  border-color: rgba(124, 106, 239, 0.25);
+}
+
+.df-sidebar-upgrade-icon {
+  font-size: 1.2rem;
+  background: linear-gradient(135deg, var(--df-primary-light), var(--df-accent));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.df-sidebar-upgrade-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--df-text-primary);
+}
+
+.df-sidebar-upgrade-desc {
+  font-size: 0.75rem;
+  color: var(--df-text-muted);
+}
+
+
+/* ─── Collapsed State ─── */
+.df-sidebar.collapsed .df-sidebar-section-header {
+  justify-content: center;
+  padding: 10px;
+}
+
+.df-sidebar.collapsed .df-sidebar-toggle {
+  justify-content: center;
+}
+
+
+/* ─── Mobile ─── */
+@media (max-width: 768px) {
+  .df-sidebar {
+    position: fixed;
+    left: 0;
+    top: var(--df-navbar-height);
+    transform: translateX(-100%);
+    transition: transform var(--df-transition-base);
+    box-shadow: var(--df-shadow-lg);
+  }
+
+  .df-sidebar.mobile-open {
+    transform: translateX(0);
+  }
+}

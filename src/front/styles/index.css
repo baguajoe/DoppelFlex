@@ -1,3 +1,293 @@
-/* 
-    General Styles used on every website (Don't Repeat Yourself)
-*/
+/* src/front/styles/index.css */
+/* Main application styles */
+
+/* Import Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;450;500;600;700;800&display=swap');
+
+/* ─── Root App Container ─── */
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ─── Main Layout ─── */
+.app-layout {
+  display: flex;
+  flex: 1;
+}
+
+.main-content {
+  flex: 1;
+  padding: var(--df-space-lg);
+  min-height: calc(100vh - var(--df-navbar-height));
+  background: var(--df-bg-base);
+}
+
+/* ─── Page Containers ─── */
+.page-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: var(--df-space-md);
+}
+
+.page-header {
+  margin-bottom: var(--df-space-xl);
+}
+
+.page-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--df-text-primary);
+  margin-bottom: var(--df-space-sm);
+}
+
+.page-subtitle {
+  font-size: 1rem;
+  color: var(--df-text-secondary);
+}
+
+/* ─── Grid Layouts ─── */
+.df-grid {
+  display: grid;
+  gap: var(--df-space-lg);
+}
+
+.df-grid-2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.df-grid-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.df-grid-4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+@media (max-width: 1024px) {
+  .df-grid-4 { grid-template-columns: repeat(2, 1fr); }
+  .df-grid-3 { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 640px) {
+  .df-grid-4,
+  .df-grid-3,
+  .df-grid-2 { grid-template-columns: 1fr; }
+}
+
+/* ─── Flex Utilities ─── */
+.df-flex {
+  display: flex;
+}
+
+.df-flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.df-flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.df-flex-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.df-gap-sm { gap: var(--df-space-sm); }
+.df-gap-md { gap: var(--df-space-md); }
+.df-gap-lg { gap: var(--df-space-lg); }
+
+/* ─── Loading States ─── */
+.df-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--df-space-xl);
+}
+
+.df-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--df-border);
+  border-top-color: var(--df-primary);
+  border-radius: 50%;
+  animation: df-spin 0.8s linear infinite;
+}
+
+@keyframes df-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ─── Empty States ─── */
+.df-empty {
+  text-align: center;
+  padding: var(--df-space-2xl);
+  color: var(--df-text-muted);
+}
+
+.df-empty-icon {
+  font-size: 3rem;
+  margin-bottom: var(--df-space-md);
+  opacity: 0.5;
+}
+
+.df-empty-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--df-text-secondary);
+  margin-bottom: var(--df-space-sm);
+}
+
+.df-empty-description {
+  font-size: 0.9rem;
+  max-width: 300px;
+  margin: 0 auto;
+}
+
+/* ─── Alert Messages ─── */
+.df-alert {
+  padding: var(--df-space-md);
+  border-radius: var(--df-radius-md);
+  margin-bottom: var(--df-space-md);
+}
+
+.df-alert-success {
+  background: rgba(0, 230, 118, 0.1);
+  border: 1px solid rgba(0, 230, 118, 0.3);
+  color: var(--df-success);
+}
+
+.df-alert-error {
+  background: rgba(255, 92, 114, 0.1);
+  border: 1px solid rgba(255, 92, 114, 0.3);
+  color: var(--df-error);
+}
+
+.df-alert-warning {
+  background: rgba(255, 171, 0, 0.1);
+  border: 1px solid rgba(255, 171, 0, 0.3);
+  color: var(--df-warning);
+}
+
+.df-alert-info {
+  background: rgba(0, 176, 255, 0.1);
+  border: 1px solid rgba(0, 176, 255, 0.3);
+  color: var(--df-info);
+}
+
+/* ─── Bootstrap Overrides for Dark Theme ─── */
+.form-control,
+.form-select {
+  background-color: var(--df-bg-surface);
+  border-color: var(--df-border);
+  color: var(--df-text-primary);
+}
+
+.form-control:focus,
+.form-select:focus {
+  background-color: var(--df-bg-surface);
+  border-color: var(--df-primary);
+  color: var(--df-text-primary);
+  box-shadow: 0 0 0 3px rgba(124, 106, 239, 0.15);
+}
+
+.form-control::placeholder {
+  color: var(--df-text-muted);
+}
+
+.form-label {
+  color: var(--df-text-secondary);
+  font-weight: 500;
+}
+
+.card {
+  background: var(--df-bg-card);
+  border-color: var(--df-border);
+}
+
+.card-header {
+  background: rgba(255, 255, 255, 0.02);
+  border-bottom-color: var(--df-border);
+}
+
+.card-body {
+  color: var(--df-text-secondary);
+}
+
+.btn-primary {
+  background: var(--df-primary);
+  border-color: var(--df-primary);
+}
+
+.btn-primary:hover {
+  background: var(--df-primary-dark);
+  border-color: var(--df-primary-dark);
+}
+
+.btn-secondary {
+  background: var(--df-bg-surface);
+  border-color: var(--df-border);
+  color: var(--df-text-primary);
+}
+
+.btn-success {
+  background: var(--df-success);
+  border-color: var(--df-success);
+}
+
+.btn-danger {
+  background: var(--df-error);
+  border-color: var(--df-error);
+}
+
+.btn-warning {
+  background: var(--df-warning);
+  border-color: var(--df-warning);
+  color: var(--df-bg-base);
+}
+
+.btn-info {
+  background: var(--df-info);
+  border-color: var(--df-info);
+}
+
+.alert {
+  border-radius: var(--df-radius-md);
+}
+
+.alert-danger {
+  background: rgba(255, 92, 114, 0.1);
+  border-color: rgba(255, 92, 114, 0.3);
+  color: var(--df-error);
+}
+
+.alert-success {
+  background: rgba(0, 230, 118, 0.1);
+  border-color: rgba(0, 230, 118, 0.3);
+  color: var(--df-success);
+}
+
+.alert-info {
+  background: rgba(0, 176, 255, 0.1);
+  border-color: rgba(0, 176, 255, 0.3);
+  color: var(--df-info);
+}
+
+.text-muted {
+  color: var(--df-text-muted) !important;
+}
+
+.border-top {
+  border-color: var(--df-border) !important;
+}
+
+/* ─── Selection ─── */
+::selection {
+  background: rgba(124, 106, 239, 0.3);
+  color: white;
+}

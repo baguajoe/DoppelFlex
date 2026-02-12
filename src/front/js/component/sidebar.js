@@ -28,9 +28,7 @@ const sidebarSections = [
     ),
     links: [
       { to: "/motion", label: "Live Motion" },
-      { to: "/live-avatar", label: "Live Avatar" },
       { to: "/motion-from-video", label: "From Video" },
-      { to: "/replay", label: "Replay Session" },
       { to: "/dance-sync", label: "Dance Sync" },
       { to: "/beat-editor", label: "Beat Editor" },
       { to: "/beatmap-editor", label: "BeatMap Editor" },
