@@ -29,6 +29,7 @@ import AvatarCustomizationPage from './pages/AvatarCustomizationPage';
 import AccountSettingsPage from "./pages/AccountSettingsPage";
 import ClothingMatchPage from './pages/ClothingMatchPage';
 import MyOutfitsPage from "./pages/MyOutfitsPage";
+import FullBodyCapturePage from './pages/FullBodyCapturePage';
 import demo from './pages/demo.js';
 import single from './pages/single.js';
 
@@ -63,6 +64,7 @@ const Layout = () => {
               <Route path="/avatar-customization" element={<AvatarCustomizationPage />} />
               <Route path="/account-settings" element={<AccountSettingsPage />} />
               <Route path="/my-outfits" element={<MyOutfitsPage />} />
+              <Route path="/full-capture" element={<FullBodyCapturePage />} />
               <Route path="/demo" element={<demo />} />
               <Route path="/single" element={<single />} />
               <Route path="*" element={<ErrorPage />} />

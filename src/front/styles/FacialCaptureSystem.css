@@ -1,0 +1,344 @@
+/* src/front/styles/FacialCaptureSystem.css */
+
+/* ─── Container ─── */
+.face-capture {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  background-color: #0d0d14;
+  color: #e0e0e0;
+  font-family: 'Inter', 'Segoe UI', sans-serif;
+  border-radius: 12px;
+  border: 1px solid #1a1a2e;
+}
+
+.face-capture__title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 4px 0;
+}
+
+.face-capture__subtitle {
+  font-size: 13px;
+  color: #888;
+  margin: 0;
+}
+
+/* ─── Preview Area ─── */
+.face-capture__preview {
+  position: relative;
+  border-radius: 10px;
+  overflow: hidden;
+  background-color: #111;
+  min-height: 240px;
+}
+
+.face-capture__video {
+  display: none;
+}
+
+.face-capture__canvas {
+  width: 100%;
+  max-height: 360px;
+  border-radius: 10px;
+  display: block;
+}
+
+.face-capture__placeholder {
+  width: 100%;
+  height: 240px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #555;
+  font-size: 14px;
+  gap: 8px;
+}
+
+.face-capture__placeholder-icon {
+  font-size: 48px;
+  opacity: 0.4;
+}
+
+/* ─── Status Bar ─── */
+.face-capture__status {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  right: 8px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: 11px;
+  color: #aaa;
+  background-color: rgba(0, 0, 0, 0.7);
+  padding: 5px 10px;
+  border-radius: 6px;
+  backdrop-filter: blur(4px);
+}
+
+.face-capture__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.face-capture__dot--active {
+  background-color: #4ade80;
+  box-shadow: 0 0 6px #4ade80;
+}
+
+.face-capture__dot--inactive {
+  background-color: #f87171;
+}
+
+.face-capture__landmark-count {
+  margin-left: auto;
+  color: #666;
+}
+
+/* ─── Controls ─── */
+.face-capture__controls {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.face-capture__btn {
+  flex: 1;
+  min-width: 140px;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: background-color 0.2s, transform 0.1s;
+}
+
+.face-capture__btn:hover {
+  transform: scale(1.02);
+}
+
+.face-capture__btn:active {
+  transform: scale(0.98);
+}
+
+.face-capture__btn--start {
+  background-color: #8b5cf6;
+  color: white;
+}
+
+.face-capture__btn--start:hover {
+  background-color: #7c3aed;
+}
+
+.face-capture__btn--stop {
+  background-color: #ef4444;
+  color: white;
+}
+
+.face-capture__btn--stop:hover {
+  background-color: #dc2626;
+}
+
+.face-capture__btn--secondary {
+  background-color: #1e1e2e;
+  color: #c0c0c0;
+  border: 1px solid #333;
+  flex: 0;
+  min-width: auto;
+  padding: 8px 14px;
+  font-size: 12px;
+}
+
+.face-capture__btn--secondary:hover {
+  background-color: #2a2a3e;
+}
+
+/* ─── Settings Panel ─── */
+.face-capture__settings {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  padding: 10px 14px;
+  background-color: #111118;
+  border-radius: 8px;
+  border: 1px solid #1a1a2e;
+  font-size: 13px;
+  flex-wrap: wrap;
+}
+
+.face-capture__checkbox-label {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  cursor: pointer;
+  color: #ccc;
+}
+
+.face-capture__checkbox-label input[type="checkbox"] {
+  accent-color: #8b5cf6;
+}
+
+.face-capture__select {
+  background-color: #1e1e2e;
+  color: #ccc;
+  border: 1px solid #333;
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 12px;
+}
+
+/* ─── Expression Debug Bars ─── */
+.face-capture__debug-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 10px 14px;
+  background-color: #111118;
+  border-radius: 8px;
+  border: 1px solid #1a1a2e;
+}
+
+.face-capture__debug-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #888;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.face-capture__bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+}
+
+.face-capture__bar-label {
+  width: 90px;
+  color: #888;
+  text-align: right;
+  flex-shrink: 0;
+  font-size: 11px;
+}
+
+.face-capture__bar-track {
+  flex: 1;
+  height: 8px;
+  background-color: #1e1e2e;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.face-capture__bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.06s ease-out;
+}
+
+.face-capture__bar-fill--jaw { background-color: #f59e0b; }
+.face-capture__bar-fill--eye { background-color: #3b82f6; }
+.face-capture__bar-fill--brow { background-color: #8b5cf6; }
+.face-capture__bar-fill--smile { background-color: #10b981; }
+.face-capture__bar-fill--head { background-color: #ef4444; }
+.face-capture__bar-fill--pucker { background-color: #ec4899; }
+
+.face-capture__bar-value {
+  width: 38px;
+  color: #666;
+  font-size: 10px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* ─── Recording Indicator ─── */
+.face-capture__recording-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #ef4444;
+  font-weight: bold;
+  font-size: 11px;
+  animation: face-capture-pulse 1s infinite;
+}
+
+@keyframes face-capture-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* ─── Error ─── */
+.face-capture__error {
+  padding: 10px 14px;
+  background-color: #1a0000;
+  border: 1px solid #ef4444;
+  border-radius: 8px;
+  color: #f87171;
+  font-size: 13px;
+}
+
+/* ─── Expression Snapshot ─── */
+.face-capture__snapshot {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 10px;
+  background-color: #111118;
+  border-radius: 8px;
+  border: 1px solid #1a1a2e;
+}
+
+.face-capture__chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px 12px;
+  background-color: #1a1a2e;
+  border-radius: 6px;
+  font-size: 11px;
+  min-width: 50px;
+}
+
+.face-capture__chip-label {
+  color: #666;
+  font-size: 10px;
+}
+
+.face-capture__chip-value {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.face-capture__chip-value--active {
+  color: #4ade80;
+}
+
+.face-capture__chip-value--inactive {
+  color: #888;
+}
+
+/* ─── Responsive ─── */
+@media (max-width: 768px) {
+  .face-capture__controls {
+    flex-direction: column;
+  }
+
+  .face-capture__btn {
+    width: 100%;
+  }
+
+  .face-capture__settings {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .face-capture__bar-label {
+    width: 70px;
+    font-size: 10px;
+  }
+}
