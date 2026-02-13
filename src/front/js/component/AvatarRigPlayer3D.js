@@ -1,278 +1,395 @@
-// src/front/js/component/AvatarRigPlayer3D.js
-// Plays back recorded motion capture data on a 3D avatar
+// AvatarRigPlayer3D.js — ROTATION-BASED bone mapping for Mixamo rigs
+// Replaces the old position-based system that caused static/broken avatars
+// Drop-in replacement: src/front/js/component/AvatarRigPlayer3D.js
 
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useMemo } from 'react';
 import { Canvas, useFrame, useLoader } from '@react-three/fiber';
-import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
-import { POSE_LANDMARKS, BONE_CONNECTIONS, STANDARD_BONES } from '../../utils/poseConstants';
+import { clone as skeletonClone } from 'three/examples/jsm/utils/SkeletonUtils';
+import { OneEuroFilter } from '../utils/OneEuroFilter';
 
-/**
- * Find bone by name with fallback aliases
- */
-const findBone = (model, boneName) => {
-  if (!model) return null;
-  
-  // Try exact match
-  let bone = model.getObjectByName(boneName);
-  if (bone) return bone;
+// ─────────────────────────────────────────────────────────────
+// MEDIAPIPE POSE LANDMARK INDICES
+// ─────────────────────────────────────────────────────────────
+const MP = {
+  NOSE: 0,
+  LEFT_SHOULDER: 11, RIGHT_SHOULDER: 12,
+  LEFT_ELBOW: 13, RIGHT_ELBOW: 14,
+  LEFT_WRIST: 15, RIGHT_WRIST: 16,
+  LEFT_HIP: 23, RIGHT_HIP: 24,
+  LEFT_KNEE: 25, RIGHT_KNEE: 26,
+  LEFT_ANKLE: 27, RIGHT_ANKLE: 28,
+  LEFT_HEEL: 29, RIGHT_HEEL: 30,
+  LEFT_FOOT_INDEX: 31, RIGHT_FOOT_INDEX: 32,
+};
 
-  // Try common variations
-  const variations = [
-    boneName,
-    `mixamorig:${boneName}`,
-    `mixamorig${boneName}`,
-    boneName.replace('UpperArm', 'Arm'),
-    boneName.replace('LowerArm', 'ForeArm'),
-    boneName.replace('UpperLeg', 'UpLeg'),
-    boneName.replace('LowerLeg', 'Leg'),
-    // Unity style
-    boneName.replace('Upper', ''),
-    boneName.replace('Lower', 'Fore'),
-  ];
+// ─────────────────────────────────────────────────────────────
+// MIXAMO BONE NAMES (works with X Bot, Y Bot, any Mixamo char)
+// We try multiple naming conventions to handle different rigs
+// ─────────────────────────────────────────────────────────────
+const BONE_NAME_VARIANTS = {
+  hips:           ['mixamorig:Hips', 'mixamorigHips', 'Hips', 'hips', 'pelvis'],
+  spine:          ['mixamorig:Spine', 'mixamorigSpine', 'Spine', 'spine'],
+  spine1:         ['mixamorig:Spine1', 'mixamorigSpine1', 'Spine1', 'Chest', 'chest'],
+  spine2:         ['mixamorig:Spine2', 'mixamorigSpine2', 'Spine2', 'UpperChest'],
+  neck:           ['mixamorig:Neck', 'mixamorigNeck', 'Neck', 'neck'],
+  head:           ['mixamorig:Head', 'mixamorigHead', 'Head', 'head'],
+  leftShoulder:   ['mixamorig:LeftShoulder', 'mixamorigLeftShoulder', 'LeftShoulder', 'l_clavicle'],
+  leftArm:        ['mixamorig:LeftArm', 'mixamorigLeftArm', 'LeftArm', 'LeftUpperArm', 'l_upper_arm'],
+  leftForeArm:    ['mixamorig:LeftForeArm', 'mixamorigLeftForeArm', 'LeftForeArm', 'LeftLowerArm', 'l_forearm'],
+  leftHand:       ['mixamorig:LeftHand', 'mixamorigLeftHand', 'LeftHand', 'l_hand'],
+  rightShoulder:  ['mixamorig:RightShoulder', 'mixamorigRightShoulder', 'RightShoulder', 'r_clavicle'],
+  rightArm:       ['mixamorig:RightArm', 'mixamorigRightArm', 'RightArm', 'RightUpperArm', 'r_upper_arm'],
+  rightForeArm:   ['mixamorig:RightForeArm', 'mixamorigRightForeArm', 'RightForeArm', 'RightLowerArm', 'r_forearm'],
+  rightHand:      ['mixamorig:RightHand', 'mixamorigRightHand', 'RightHand', 'r_hand'],
+  leftUpLeg:      ['mixamorig:LeftUpLeg', 'mixamorigLeftUpLeg', 'LeftUpLeg', 'LeftThigh', 'l_femur'],
+  leftLeg:        ['mixamorig:LeftLeg', 'mixamorigLeftLeg', 'LeftLeg', 'LeftShin', 'l_tibia'],
+  leftFoot:       ['mixamorig:LeftFoot', 'mixamorigLeftFoot', 'LeftFoot', 'l_foot'],
+  leftToeBase:    ['mixamorig:LeftToeBase', 'mixamorigLeftToeBase', 'LeftToeBase', 'l_toe_base'],
+  rightUpLeg:     ['mixamorig:RightUpLeg', 'mixamorigRightUpLeg', 'RightUpLeg', 'RightThigh', 'r_femur'],
+  rightLeg:       ['mixamorig:RightLeg', 'mixamorigRightLeg', 'RightLeg', 'RightShin', 'r_tibia'],
+  rightFoot:      ['mixamorig:RightFoot', 'mixamorigRightFoot', 'RightFoot', 'r_foot'],
+  rightToeBase:   ['mixamorig:RightToeBase', 'mixamorigRightToeBase', 'RightToeBase', 'r_toe_base'],
+};
 
-  for (const name of variations) {
-    bone = model.getObjectByName(name);
+// ─────────────────────────────────────────────────────────────
+// HELPER: Find a bone by trying multiple name variants
+// ─────────────────────────────────────────────────────────────
+function findBone(skeleton, key) {
+  const variants = BONE_NAME_VARIANTS[key];
+  if (!variants || !skeleton) return null;
+  for (const name of variants) {
+    const bone = skeleton.getBoneByName(name);
     if (bone) return bone;
   }
-
   return null;
-};
+}
 
-/**
- * Calculate rotation between two points
- */
-const calculateRotation = (from, to) => {
-  const direction = new THREE.Vector3(
-    to.x - from.x,
-    -(to.y - from.y),
-    -(to.z - from.z)
+// ─────────────────────────────────────────────────────────────
+// HELPER: Convert MediaPipe landmark to THREE.Vector3
+// MediaPipe: x right [0-1], y down [0-1], z toward camera (negative = closer)
+// Three.js:  x right, y up, z toward camera
+// ─────────────────────────────────────────────────────────────
+function landmarkToVec3(lm) {
+  return new THREE.Vector3(
+    (lm.x - 0.5) * 2,   // center and scale x
+    -(lm.y - 0.5) * 2,   // flip y (MediaPipe y is down)
+    -lm.z * 2             // flip z
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// HELPER: Compute rotation quaternion from parent→child direction
+// Given a "from" direction (bone's rest direction) and a "to" direction
+// (where MediaPipe says the limb is pointing), compute the rotation
+// ─────────────────────────────────────────────────────────────
+function computeLimbRotation(parentLm, childLm, restDir) {
+  const currentDir = new THREE.Vector3().subVectors(
+    landmarkToVec3(childLm),
+    landmarkToVec3(parentLm)
   ).normalize();
 
-  const defaultDir = new THREE.Vector3(0, -1, 0);
-  const quaternion = new THREE.Quaternion();
-  quaternion.setFromUnitVectors(defaultDir, direction);
+  const quat = new THREE.Quaternion().setFromUnitVectors(restDir, currentDir);
+  return quat;
+}
 
-  const euler = new THREE.Euler();
-  euler.setFromQuaternion(quaternion);
-  return euler;
+// ─────────────────────────────────────────────────────────────
+// REST POSE DIRECTIONS (T-pose for Mixamo characters)
+// These define which way each bone points in the default pose
+// ─────────────────────────────────────────────────────────────
+const REST_DIRS = {
+  // Arms: left arm points +X, right arm points -X in T-pose
+  leftArm:      new THREE.Vector3(-1, 0, 0),
+  leftForeArm:  new THREE.Vector3(-1, 0, 0),
+  rightArm:     new THREE.Vector3(1, 0, 0),
+  rightForeArm: new THREE.Vector3(1, 0, 0),
+  // Legs: both point downward -Y
+  leftUpLeg:    new THREE.Vector3(0, -1, 0),
+  leftLeg:      new THREE.Vector3(0, -1, 0),
+  rightUpLeg:   new THREE.Vector3(0, -1, 0),
+  rightLeg:     new THREE.Vector3(0, -1, 0),
+  // Spine: points upward +Y
+  spine:        new THREE.Vector3(0, 1, 0),
+  neck:         new THREE.Vector3(0, 1, 0),
 };
 
-/**
- * Avatar component that updates with pose data
- */
-const AvatarRig = ({ recordedFrames, avatarUrl, isPlaying = true, playbackSpeed = 1 }) => {
-  const groupRef = useRef();
-  const modelRef = useRef();
+// ─────────────────────────────────────────────────────────────
+// VISIBILITY THRESHOLD — below this, we skip the landmark
+// Set very low to catch legs (MediaPipe often reports low vis for legs)
+// ─────────────────────────────────────────────────────────────
+const VIS_THRESHOLD = 0.01;
+
+function isVisible(lm) {
+  return lm && (lm.visibility === undefined || lm.visibility > VIS_THRESHOLD);
+}
+
+// ─────────────────────────────────────────────────────────────
+// MAIN AVATAR RIG COMPONENT
+// ─────────────────────────────────────────────────────────────
+const AvatarRig = ({ recordedFrames, avatarUrl, liveFrame, smoothingEnabled = true }) => {
+  const avatarRef = useRef();
   const frameIndex = useRef(0);
-  const lastTime = useRef(0);
-  const [modelLoaded, setModelLoaded] = useState(false);
-  const [boneList, setBoneList] = useState([]);
+  const bonesRef = useRef({});
+  const skeletonRef = useRef(null);
+  const filtersRef = useRef({});
 
-  // Load the avatar model
   const gltf = useLoader(GLTFLoader, avatarUrl);
+  const clonedScene = useMemo(() => skeletonClone(gltf.scene), [gltf]);
 
+  // ── Setup: find skeleton & cache bone references ──
   useEffect(() => {
-    if (gltf && groupRef.current) {
-      // Clone the scene to avoid issues with reuse
-      const model = gltf.scene.clone();
-      
-      // Clear previous model
-      while (groupRef.current.children.length > 0) {
-        groupRef.current.remove(groupRef.current.children[0]);
-      }
-      
-      groupRef.current.add(model);
-      modelRef.current = model;
+    if (!avatarRef.current || !clonedScene) return;
 
-      // List all bones for debugging
-      const bones = [];
-      model.traverse((child) => {
-        if (child.isBone) {
-          bones.push(child.name);
-        }
-      });
-      setBoneList(bones);
-      console.log('Avatar bones found:', bones);
+    avatarRef.current.add(clonedScene);
 
-      setModelLoaded(true);
-    }
-  }, [gltf]);
-
-  // Animation loop
-  useFrame((state, delta) => {
-    if (!isPlaying || !modelLoaded || !recordedFrames || recordedFrames.length === 0) {
-      return;
-    }
-
-    if (!modelRef.current) return;
-
-    // Advance frame based on time
-    lastTime.current += delta * playbackSpeed;
-    
-    // Find the appropriate frame based on timestamp
-    const currentTime = lastTime.current;
-    let frame = recordedFrames[frameIndex.current];
-
-    // Find frame matching current time
-    while (
-      frameIndex.current < recordedFrames.length - 1 &&
-      recordedFrames[frameIndex.current + 1].time <= currentTime
-    ) {
-      frameIndex.current++;
-    }
-
-    // Loop playback
-    if (frameIndex.current >= recordedFrames.length - 1) {
-      frameIndex.current = 0;
-      lastTime.current = 0;
-    }
-
-    frame = recordedFrames[frameIndex.current];
-    if (!frame || !frame.landmarks) return;
-
-    const landmarks = frame.landmarks;
-
-    // Apply bone rotations
-    BONE_CONNECTIONS.forEach(({ bone, from, to }) => {
-      const boneObj = findBone(modelRef.current, bone);
-      
-      if (boneObj && landmarks[from] && landmarks[to]) {
-        // Check visibility
-        if (landmarks[from].visibility < 0.5 || landmarks[to].visibility < 0.5) {
-          return;
-        }
-
-        const rotation = calculateRotation(landmarks[from], landmarks[to]);
-
-        // Smooth interpolation
-        boneObj.rotation.x = THREE.MathUtils.lerp(boneObj.rotation.x, rotation.x, 0.3);
-        boneObj.rotation.y = THREE.MathUtils.lerp(boneObj.rotation.y, rotation.y, 0.3);
-        boneObj.rotation.z = THREE.MathUtils.lerp(boneObj.rotation.z, rotation.z, 0.3);
+    // Find the SkinnedMesh to get the skeleton
+    let skeleton = null;
+    clonedScene.traverse((child) => {
+      if (child.isSkinnedMesh && child.skeleton) {
+        skeleton = child.skeleton;
       }
     });
 
-    // Apply hip position
-    const hips = findBone(modelRef.current, STANDARD_BONES.HIPS);
-    if (hips && landmarks[POSE_LANDMARKS.LEFT_HIP] && landmarks[POSE_LANDMARKS.RIGHT_HIP]) {
-      const leftHip = landmarks[POSE_LANDMARKS.LEFT_HIP];
-      const rightHip = landmarks[POSE_LANDMARKS.RIGHT_HIP];
-
-      const hipX = ((leftHip.x + rightHip.x) / 2 - 0.5) * 2;
-      const hipY = -((leftHip.y + rightHip.y) / 2 - 0.5) * 2;
-      const hipZ = -((leftHip.z + rightHip.z) / 2) * 2;
-
-      hips.position.x = THREE.MathUtils.lerp(hips.position.x, hipX, 0.3);
-      hips.position.y = THREE.MathUtils.lerp(hips.position.y, hipY + 1, 0.3); // Offset up
-      hips.position.z = THREE.MathUtils.lerp(hips.position.z, hipZ, 0.3);
+    if (!skeleton) {
+      console.warn('[AvatarRig] No skeleton found in model!');
+      return;
     }
 
-    // Apply head rotation
-    const head = findBone(modelRef.current, STANDARD_BONES.HEAD);
-    if (head && landmarks[POSE_LANDMARKS.NOSE]) {
-      const nose = landmarks[POSE_LANDMARKS.NOSE];
-      const leftEar = landmarks[POSE_LANDMARKS.LEFT_EAR];
-      const rightEar = landmarks[POSE_LANDMARKS.RIGHT_EAR];
+    skeletonRef.current = skeleton;
 
-      if (leftEar && rightEar) {
-        const headY = (rightEar.z - leftEar.z) * Math.PI;
-        const headZ = (rightEar.y - leftEar.y) * Math.PI * 0.5;
-        
-        head.rotation.y = THREE.MathUtils.lerp(head.rotation.y, headY, 0.3);
-        head.rotation.z = THREE.MathUtils.lerp(head.rotation.z, headZ, 0.3);
+    // Cache bone references using name variants
+    const bones = {};
+    for (const key of Object.keys(BONE_NAME_VARIANTS)) {
+      bones[key] = findBone(skeleton, key);
+      if (!bones[key]) {
+        console.warn(`[AvatarRig] Bone not found: ${key}`);
       }
     }
+    bonesRef.current = bones;
 
-    // Apply jaw animation if available
-    if (frame.jawOpen !== undefined) {
-      const jaw = findBone(modelRef.current, 'Jaw');
+    // Log discovered bones for debugging
+    console.log('[AvatarRig] Discovered bones:', 
+      Object.entries(bones)
+        .filter(([, b]) => b !== null)
+        .map(([k, b]) => `${k}→${b.name}`)
+    );
+
+    // Initialize OneEuro filters for each bone (x, y, z per bone = lots of filters)
+    const filterKeys = [
+      'hipsPos', 'hipsRotX', 'hipsRotY', 'hipsRotZ',
+      'spineX', 'spineZ', 'neckX', 'neckY', 'neckZ', 'headX', 'headY',
+      'leftArmX', 'leftArmY', 'leftArmZ',
+      'leftForeArmX', 'leftForeArmY', 'leftForeArmZ',
+      'rightArmX', 'rightArmY', 'rightArmZ',
+      'rightForeArmX', 'rightForeArmY', 'rightForeArmZ',
+      'leftUpLegX', 'leftUpLegY', 'leftUpLegZ',
+      'leftLegX', 'leftLegY', 'leftLegZ',
+      'rightUpLegX', 'rightUpLegY', 'rightUpLegZ',
+      'rightLegX', 'rightLegY', 'rightLegZ',
+    ];
+    const filters = {};
+    for (const k of filterKeys) {
+      filters[k] = new OneEuroFilter(1.0, 0.007, 1.0);
+    }
+    filtersRef.current = filters;
+
+    return () => {
+      if (avatarRef.current) {
+        avatarRef.current.remove(clonedScene);
+      }
+    };
+  }, [clonedScene]);
+
+  // ── Per-frame animation loop ──
+  useFrame(() => {
+    const bones = bonesRef.current;
+    if (!bones.hips) return; // No skeleton loaded yet
+
+    // Determine which frame to use: live webcam or recorded playback
+    let frame;
+    if (liveFrame) {
+      frame = liveFrame;
+    } else if (recordedFrames && recordedFrames.length > 0) {
+      frameIndex.current = (frameIndex.current + 1) % recordedFrames.length;
+      frame = recordedFrames[frameIndex.current];
+    } else {
+      return;
+    }
+
+    const lm = frame.landmarks || frame;
+    if (!lm || lm.length < 33) return; // MediaPipe Pose has 33 landmarks
+
+    const filters = filtersRef.current;
+    const now = performance.now() / 1000; // seconds
+    const smooth = smoothingEnabled;
+
+    // Helper: optionally filter a value
+    const f = (key, val) => {
+      if (!smooth || !filters[key]) return val;
+      return filters[key].filter(val, now);
+    };
+
+    // ─── HIPS POSITION (root motion) ───
+    if (bones.hips && isVisible(lm[MP.LEFT_HIP]) && isVisible(lm[MP.RIGHT_HIP])) {
+      const midHip = {
+        x: (lm[MP.LEFT_HIP].x + lm[MP.RIGHT_HIP].x) / 2,
+        y: (lm[MP.LEFT_HIP].y + lm[MP.RIGHT_HIP].y) / 2,
+        z: (lm[MP.LEFT_HIP].z + lm[MP.RIGHT_HIP].z) / 2,
+      };
+      // Only apply Y offset (vertical bob) and Z (depth). Keep X centered unless full body tracking.
+      const hipY = f('hipsPos', -(midHip.y - 0.5) * 0.5);
+      bones.hips.position.y = bones.hips.position.y + hipY * 0.1; // Subtle vertical movement
+
+      // Hip rotation from hip-to-hip line
+      const hipVec = new THREE.Vector3(
+        lm[MP.RIGHT_HIP].x - lm[MP.LEFT_HIP].x,
+        0,
+        lm[MP.RIGHT_HIP].z - lm[MP.LEFT_HIP].z
+      ).normalize();
+      const hipAngleY = Math.atan2(hipVec.z, hipVec.x);
+      bones.hips.rotation.y = f('hipsRotY', hipAngleY * 0.5);
+    }
+
+    // ─── SPINE / TORSO ───
+    if (bones.spine && isVisible(lm[MP.LEFT_SHOULDER]) && isVisible(lm[MP.RIGHT_SHOULDER]) 
+        && isVisible(lm[MP.LEFT_HIP]) && isVisible(lm[MP.RIGHT_HIP])) {
+      const midShoulder = landmarkToVec3({
+        x: (lm[MP.LEFT_SHOULDER].x + lm[MP.RIGHT_SHOULDER].x) / 2,
+        y: (lm[MP.LEFT_SHOULDER].y + lm[MP.RIGHT_SHOULDER].y) / 2,
+        z: (lm[MP.LEFT_SHOULDER].z + lm[MP.RIGHT_SHOULDER].z) / 2,
+      });
+      const midHipVec = landmarkToVec3({
+        x: (lm[MP.LEFT_HIP].x + lm[MP.RIGHT_HIP].x) / 2,
+        y: (lm[MP.LEFT_HIP].y + lm[MP.RIGHT_HIP].y) / 2,
+        z: (lm[MP.LEFT_HIP].z + lm[MP.RIGHT_HIP].z) / 2,
+      });
+      const torsoDir = new THREE.Vector3().subVectors(midShoulder, midHipVec).normalize();
+      
+      // Lean forward/back (X rotation) and side-to-side (Z rotation)
+      const spineX = Math.asin(Math.max(-1, Math.min(1, -torsoDir.z))) * 0.6;
+      const spineZ = Math.asin(Math.max(-1, Math.min(1, torsoDir.x))) * 0.4;
+      bones.spine.rotation.x = f('spineX', spineX);
+      bones.spine.rotation.z = f('spineZ', spineZ);
+    }
+
+    // ─── NECK / HEAD ───
+    if (bones.neck && isVisible(lm[MP.NOSE]) && isVisible(lm[MP.LEFT_SHOULDER]) && isVisible(lm[MP.RIGHT_SHOULDER])) {
+      const noseVec = landmarkToVec3(lm[MP.NOSE]);
+      const midShoulderVec = landmarkToVec3({
+        x: (lm[MP.LEFT_SHOULDER].x + lm[MP.RIGHT_SHOULDER].x) / 2,
+        y: (lm[MP.LEFT_SHOULDER].y + lm[MP.RIGHT_SHOULDER].y) / 2,
+        z: (lm[MP.LEFT_SHOULDER].z + lm[MP.RIGHT_SHOULDER].z) / 2,
+      });
+      const headDir = new THREE.Vector3().subVectors(noseVec, midShoulderVec).normalize();
+      
+      const neckX = f('neckX', Math.asin(Math.max(-1, Math.min(1, -headDir.z))) * 0.4);
+      const neckY = f('neckY', Math.atan2(headDir.x, headDir.y) * 0.3);
+      bones.neck.rotation.x = neckX;
+      bones.neck.rotation.y = neckY;
+    }
+
+    // ─── LEFT ARM ───
+    if (bones.leftArm && isVisible(lm[MP.LEFT_SHOULDER]) && isVisible(lm[MP.LEFT_ELBOW])) {
+      const q = computeLimbRotation(lm[MP.LEFT_SHOULDER], lm[MP.LEFT_ELBOW], REST_DIRS.leftArm);
+      const euler = new THREE.Euler().setFromQuaternion(q, 'XYZ');
+      bones.leftArm.rotation.x = f('leftArmX', euler.x);
+      bones.leftArm.rotation.y = f('leftArmY', euler.y);
+      bones.leftArm.rotation.z = f('leftArmZ', euler.z);
+    }
+
+    // ─── LEFT FOREARM ───
+    if (bones.leftForeArm && isVisible(lm[MP.LEFT_ELBOW]) && isVisible(lm[MP.LEFT_WRIST])) {
+      const q = computeLimbRotation(lm[MP.LEFT_ELBOW], lm[MP.LEFT_WRIST], REST_DIRS.leftForeArm);
+      const euler = new THREE.Euler().setFromQuaternion(q, 'XYZ');
+      bones.leftForeArm.rotation.x = f('leftForeArmX', euler.x);
+      bones.leftForeArm.rotation.y = f('leftForeArmY', euler.y);
+      bones.leftForeArm.rotation.z = f('leftForeArmZ', euler.z);
+    }
+
+    // ─── RIGHT ARM ───
+    if (bones.rightArm && isVisible(lm[MP.RIGHT_SHOULDER]) && isVisible(lm[MP.RIGHT_ELBOW])) {
+      const q = computeLimbRotation(lm[MP.RIGHT_SHOULDER], lm[MP.RIGHT_ELBOW], REST_DIRS.rightArm);
+      const euler = new THREE.Euler().setFromQuaternion(q, 'XYZ');
+      bones.rightArm.rotation.x = f('rightArmX', euler.x);
+      bones.rightArm.rotation.y = f('rightArmY', euler.y);
+      bones.rightArm.rotation.z = f('rightArmZ', euler.z);
+    }
+
+    // ─── RIGHT FOREARM ───
+    if (bones.rightForeArm && isVisible(lm[MP.RIGHT_ELBOW]) && isVisible(lm[MP.RIGHT_WRIST])) {
+      const q = computeLimbRotation(lm[MP.RIGHT_ELBOW], lm[MP.RIGHT_WRIST], REST_DIRS.rightForeArm);
+      const euler = new THREE.Euler().setFromQuaternion(q, 'XYZ');
+      bones.rightForeArm.rotation.x = f('rightForeArmX', euler.x);
+      bones.rightForeArm.rotation.y = f('rightForeArmY', euler.y);
+      bones.rightForeArm.rotation.z = f('rightForeArmZ', euler.z);
+    }
+
+    // ─── LEFT UPPER LEG ───
+    if (bones.leftUpLeg && isVisible(lm[MP.LEFT_HIP]) && isVisible(lm[MP.LEFT_KNEE])) {
+      const q = computeLimbRotation(lm[MP.LEFT_HIP], lm[MP.LEFT_KNEE], REST_DIRS.leftUpLeg);
+      const euler = new THREE.Euler().setFromQuaternion(q, 'XYZ');
+      bones.leftUpLeg.rotation.x = f('leftUpLegX', euler.x);
+      bones.leftUpLeg.rotation.y = f('leftUpLegY', euler.y);
+      bones.leftUpLeg.rotation.z = f('leftUpLegZ', euler.z);
+    }
+
+    // ─── LEFT LOWER LEG ───
+    if (bones.leftLeg && isVisible(lm[MP.LEFT_KNEE]) && isVisible(lm[MP.LEFT_ANKLE])) {
+      const q = computeLimbRotation(lm[MP.LEFT_KNEE], lm[MP.LEFT_ANKLE], REST_DIRS.leftLeg);
+      const euler = new THREE.Euler().setFromQuaternion(q, 'XYZ');
+      bones.leftLeg.rotation.x = f('leftLegX', euler.x);
+      bones.leftLeg.rotation.y = f('leftLegY', euler.y);
+      bones.leftLeg.rotation.z = f('leftLegZ', euler.z);
+    }
+
+    // ─── RIGHT UPPER LEG ───
+    if (bones.rightUpLeg && isVisible(lm[MP.RIGHT_HIP]) && isVisible(lm[MP.RIGHT_KNEE])) {
+      const q = computeLimbRotation(lm[MP.RIGHT_HIP], lm[MP.RIGHT_KNEE], REST_DIRS.rightUpLeg);
+      const euler = new THREE.Euler().setFromQuaternion(q, 'XYZ');
+      bones.rightUpLeg.rotation.x = f('rightUpLegX', euler.x);
+      bones.rightUpLeg.rotation.y = f('rightUpLegY', euler.y);
+      bones.rightUpLeg.rotation.z = f('rightUpLegZ', euler.z);
+    }
+
+    // ─── RIGHT LOWER LEG ───
+    if (bones.rightLeg && isVisible(lm[MP.RIGHT_KNEE]) && isVisible(lm[MP.RIGHT_ANKLE])) {
+      const q = computeLimbRotation(lm[MP.RIGHT_KNEE], lm[MP.RIGHT_ANKLE], REST_DIRS.rightLeg);
+      const euler = new THREE.Euler().setFromQuaternion(q, 'XYZ');
+      bones.rightLeg.rotation.x = f('rightLegX', euler.x);
+      bones.rightLeg.rotation.y = f('rightLegY', euler.y);
+      bones.rightLeg.rotation.z = f('rightLegZ', euler.z);
+    }
+
+    // ─── JAW / LIP SYNC ───
+    if (bones.head && frame.jawOpen !== undefined) {
+      const jaw = skeletonRef.current?.getBoneByName('mixamorig:Jaw')
+                || skeletonRef.current?.getBoneByName('mixamorigJaw') 
+                || skeletonRef.current?.getBoneByName('Jaw');
       if (jaw) {
         jaw.rotation.x = THREE.MathUtils.lerp(jaw.rotation.x, frame.jawOpen * 0.3, 0.2);
       }
     }
   });
 
-  return <group ref={groupRef} />;
+  return <group ref={avatarRef} />;
 };
 
-/**
- * Main player component
- */
-const AvatarRigPlayer3D = ({ 
-  recordedFrames, 
-  avatarUrl,
-  isPlaying = true,
-  playbackSpeed = 1,
-  showControls = true,
-  height = '500px',
-}) => {
-  // Use backend URL for default avatar
-  const backendUrl = process.env.REACT_APP_BACKEND_URL || '';
-  const defaultAvatarUrl = avatarUrl || `${backendUrl}/static/uploads/me_wit_locks.jpg_avatar.glb`;
-  
-  const [localIsPlaying, setLocalIsPlaying] = useState(isPlaying);
-  const [localSpeed, setLocalSpeed] = useState(playbackSpeed);
-
+// ─────────────────────────────────────────────────────────────
+// EXPORTED COMPONENT
+// ─────────────────────────────────────────────────────────────
+const AvatarRigPlayer3D = ({ recordedFrames, avatarUrl, liveFrame, smoothingEnabled }) => {
   return (
-    <div style={{ width: '100%', height }}>
-      {showControls && (
-        <div style={{ marginBottom: '10px', display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <button 
-            onClick={() => setLocalIsPlaying(!localIsPlaying)}
-            style={{ padding: '8px 16px' }}
-          >
-            {localIsPlaying ? '⏸ Pause' : '▶ Play'}
-          </button>
-          
-          <label>
-            Speed: 
-            <input 
-              type="range" 
-              min="0.25" 
-              max="2" 
-              step="0.25" 
-              value={localSpeed}
-              onChange={(e) => setLocalSpeed(parseFloat(e.target.value))}
-              style={{ marginLeft: '8px' }}
-            />
-            {localSpeed}x
-          </label>
-          
-          <span style={{ marginLeft: 'auto', color: '#666' }}>
-            Frames: {recordedFrames?.length || 0}
-          </span>
-        </div>
-      )}
-      
-      <Canvas camera={{ position: [0, 1.5, 3], fov: 50 }}>
-        <ambientLight intensity={0.6} />
-        <directionalLight position={[5, 10, 5]} intensity={1} castShadow />
-        <directionalLight position={[-5, 5, -5]} intensity={0.3} />
-        
-        {recordedFrames && recordedFrames.length > 0 && (
-          <AvatarRig 
-            recordedFrames={recordedFrames} 
-            avatarUrl={defaultAvatarUrl}
-            isPlaying={localIsPlaying}
-            playbackSpeed={localSpeed}
-          />
-        )}
-        
-        <OrbitControls 
-          enablePan={true}
-          enableZoom={true}
-          minDistance={1}
-          maxDistance={10}
-        />
-        
-        {/* Ground plane for reference */}
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
-          <planeGeometry args={[10, 10]} />
-          <meshStandardMaterial color="#cccccc" />
-        </mesh>
-      </Canvas>
-    </div>
+    <Canvas camera={{ position: [0, 1.5, 3], fov: 50 }}>
+      <ambientLight intensity={0.8} />
+      <directionalLight position={[3, 5, 5]} intensity={1} />
+      <AvatarRig 
+        recordedFrames={recordedFrames} 
+        avatarUrl={avatarUrl} 
+        liveFrame={liveFrame}
+        smoothingEnabled={smoothingEnabled}
+      />
+    </Canvas>
   );
 };
 

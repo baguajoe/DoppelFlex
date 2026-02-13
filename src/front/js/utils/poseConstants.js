@@ -145,6 +145,7 @@ export const BONE_CONNECTIONS = [
 export const BONE_NAME_ALIASES = {
   // Mixamo style
   'mixamorig:LeftArm': STANDARD_BONES.LEFT_UPPER_ARM,
+  'mixamorig1:LeftArm': STANDARD_BONES.LEFT_UPPER_ARM,
   'mixamorig:LeftForeArm': STANDARD_BONES.LEFT_LOWER_ARM,
   'mixamorig:RightArm': STANDARD_BONES.RIGHT_UPPER_ARM,
   'mixamorig:RightForeArm': STANDARD_BONES.RIGHT_LOWER_ARM,
@@ -170,4 +171,27 @@ export default {
   POSE_TO_BONE_MAP,
   BONE_CONNECTIONS,
   BONE_NAME_ALIASES,
+};
+// Mixamorig1 aliases (for some Mixamo exports)
+export const MIXAMO_BONE_MAP = {
+  'mixamorig1:Hips': 'Hips',
+  'mixamorig1:Spine': 'Spine',
+  'mixamorig1:Spine1': 'Spine1',
+  'mixamorig1:Spine2': 'Spine2',
+  'mixamorig1:Neck': 'Neck',
+  'mixamorig1:Head': 'Head',
+  'mixamorig1:LeftShoulder': 'LeftShoulder',
+  'mixamorig1:LeftArm': 'LeftUpperArm',
+  'mixamorig1:LeftForeArm': 'LeftLowerArm',
+  'mixamorig1:LeftHand': 'LeftHand',
+  'mixamorig1:RightShoulder': 'RightShoulder',
+  'mixamorig1:RightArm': 'RightUpperArm',
+  'mixamorig1:RightForeArm': 'RightLowerArm',
+  'mixamorig1:RightHand': 'RightHand',
+  'mixamorig1:LeftUpLeg': 'LeftUpperLeg',
+  'mixamorig1:LeftLeg': 'LeftLowerLeg',
+  'mixamorig1:LeftFoot': 'LeftFoot',
+  'mixamorig1:RightUpLeg': 'RightUpperLeg',
+  'mixamorig1:RightLeg': 'RightLowerLeg',
+  'mixamorig1:RightFoot': 'RightFoot',
 };

@@ -3,6 +3,9 @@ import React, { useEffect, useState, Suspense } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, useGLTF, Environment } from "@react-three/drei";
 
+// ─── Consistent model path ───
+const DEFAULT_MODEL = "/static/models/Y_Bot.glb";
+
 // Component that loads and applies skin color to meshes
 const ModelViewer = ({ url, skinColor }) => {
   const { scene } = useGLTF(url);
@@ -25,6 +28,7 @@ const AvatarPreviewPage = () => {
   const [message, setMessage] = useState("");
   const [usageInfo, setUsageInfo] = useState(null);
 
+  const backendUrl = process.env.REACT_APP_BACKEND_URL || "";
   const user_id = localStorage.getItem("user_id");
   const avatar_id = localStorage.getItem("avatar_id");
 
@@ -40,12 +44,10 @@ const AvatarPreviewPage = () => {
     }
   }, [avatar_id, user_id]);
 
-  
-
   const rigAvatar = async () => {
     setMessage("⚙️ Rigging avatar...");
     try {
-      const res = await fetch(`${process.env.BACKEND_URL}/rig-avatar`, {
+      const res = await fetch(`${backendUrl}/rig-avatar`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ avatar_id, user_id }),

@@ -1,19 +1,20 @@
 // src/front/js/pages/ReplayMotionSession.js
-// Fixed version using proper imports and correct avatar paths
-
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import AvatarRigPlayer3D from '../component/AvatarRigPlayer3D';
 
+// ─── Consistent model path ───
+const DEFAULT_MODEL = '/static/models/Y_Bot.glb';
+
 const ReplayMotionSession = () => {
   const { id: sessionId } = useParams();
   const backendUrl = process.env.REACT_APP_BACKEND_URL || '';
-  
+
   const [frames, setFrames] = useState([]);
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioFile, setAudioFile] = useState(null);
   const [audioUrl, setAudioUrl] = useState(null);
-  const [modelUrl, setModelUrl] = useState(`${backendUrl}/static/uploads/me_wit_locks.jpg_avatar.glb`);
+  const [modelUrl, setModelUrl] = useState(DEFAULT_MODEL);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -21,8 +22,8 @@ const ReplayMotionSession = () => {
   const audioRef = useRef(new Audio());
 
   const availableModels = [
-    { name: 'Default Avatar', url: `${backendUrl}/static/uploads/me_wit_locks.jpg_avatar.glb` },
-    { name: 'Rigged Avatar', url: `${backendUrl}/static/models/avatar.glb` },
+    { name: 'Y Bot', url: DEFAULT_MODEL },
+    { name: 'X Bot', url: '/static/models/xbot_avatar_compressed.glb' },
   ];
 
   // Load session from backend if sessionId provided
@@ -39,10 +40,10 @@ const ReplayMotionSession = () => {
     try {
       const res = await fetch(`${backendUrl}/motion-sessions/${id}`);
       if (!res.ok) throw new Error('Session not found');
-      
+
       const data = await res.json();
       setFrames(data.frames || []);
-      
+
       if (data.audio_url) {
         setAudioUrl(data.audio_url);
         audioRef.current.src = data.audio_url;
@@ -130,24 +131,51 @@ const ReplayMotionSession = () => {
     a.click();
   };
 
+  const handleExportFormat = async (format) => {
+    try {
+      const res = await fetch(`${backendUrl}/export-${format}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ frames }),
+      });
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `animation.${format}`;
+      a.click();
+    } catch (err) {
+      setError(`Export failed: ${err.message}`);
+    }
+  };
+
+  // Save to profile
+  const saveSessionToProfile = async () => {
+    try {
+      await fetch(`${backendUrl}/save-motion-session`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: 1, frames }),
+      });
+      alert('Session saved to profile!');
+    } catch (err) {
+      setError(`Save failed: ${err.message}`);
+    }
+  };
+
   // Calculate session stats
-  const sessionDuration = frames.length > 0 
-    ? (frames[frames.length - 1]?.time || 0).toFixed(2) 
-    : 0;
+  const sessionDuration =
+    frames.length > 0 ? (frames[frames.length - 1]?.time || 0).toFixed(2) : 0;
 
   return (
     <div className="container-fluid mt-4">
       <h2>▶️ Replay Motion Session</h2>
 
       {/* Error Display */}
-      {error && (
-        <div className="alert alert-danger">{error}</div>
-      )}
+      {error && <div className="alert alert-danger">{error}</div>}
 
       {/* Loading */}
-      {loading && (
-        <div className="alert alert-info">Loading session...</div>
-      )}
+      {loading && <div className="alert alert-info">Loading session...</div>}
 
       {/* File Inputs Row */}
       <div className="row mb-4">
@@ -221,7 +249,7 @@ const ReplayMotionSession = () => {
 
         <div className="col-md-4 d-flex align-items-end">
           <div className="text-muted">
-            <strong>Frames:</strong> {frames.length} | 
+            <strong>Frames:</strong> {frames.length} |{' '}
             <strong> Duration:</strong> {sessionDuration}s
           </div>
         </div>
@@ -259,9 +287,31 @@ const ReplayMotionSession = () => {
           💾 Export JSON
         </button>
 
-        {audioUrl && (
-          <span className="badge bg-info">🎵 Audio loaded</span>
-        )}
+        <button
+          className="btn btn-outline-secondary"
+          onClick={() => handleExportFormat('fbx')}
+          disabled={frames.length === 0}
+        >
+          Export FBX
+        </button>
+
+        <button
+          className="btn btn-outline-secondary"
+          onClick={() => handleExportFormat('glb')}
+          disabled={frames.length === 0}
+        >
+          Export GLB
+        </button>
+
+        <button
+          className="btn btn-success"
+          onClick={saveSessionToProfile}
+          disabled={frames.length === 0}
+        >
+          ☁️ Save to Profile
+        </button>
+
+        {audioUrl && <span className="badge bg-info">🎵 Audio loaded</span>}
       </div>
 
       {/* 3D Player */}
@@ -277,13 +327,15 @@ const ReplayMotionSession = () => {
               height="500px"
             />
           ) : (
-            <div 
+            <div
               className="d-flex align-items-center justify-content-center bg-light"
               style={{ height: '500px' }}
             >
               <div className="text-center text-muted">
                 <h4>No Motion Data Loaded</h4>
-                <p>Upload a JSON file or load a saved session to begin playback</p>
+                <p>
+                  Upload a JSON file or load a saved session to begin playback
+                </p>
               </div>
             </div>
           )}
@@ -308,7 +360,8 @@ const ReplayMotionSession = () => {
                 <strong>Duration:</strong> {sessionDuration} seconds
               </div>
               <div className="col-md-3">
-                <strong>Avg FPS:</strong> {(frames.length / sessionDuration).toFixed(1)}
+                <strong>Avg FPS:</strong>{' '}
+                {(frames.length / sessionDuration).toFixed(1)}
               </div>
               <div className="col-md-3">
                 <strong>First Frame:</strong> {frames[0]?.time?.toFixed(3)}s

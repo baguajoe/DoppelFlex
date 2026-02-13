@@ -20,9 +20,14 @@ const findBone = (model, boneName) => {
   const variations = [
     boneName,
     `mixamorig:${boneName}`,
+    `mixamorig1:${boneName}`,
     boneName.replace('UpperArm', 'Arm'),
     boneName.replace('LowerArm', 'ForeArm'),
     boneName.replace('UpperLeg', 'UpLeg'),
+    `mixamorig1:${boneName.replace('UpperLeg', 'UpLeg')}`,
+    `mixamorig1:${boneName.replace('LowerLeg', 'Leg')}`,
+    `mixamorig1:${boneName.replace('UpperArm', 'Arm')}`,
+    `mixamorig1:${boneName.replace('LowerArm', 'ForeArm')}`,
     boneName.replace('LowerLeg', 'Leg'),
   ];
 
@@ -36,7 +41,7 @@ const findBone = (model, boneName) => {
 /**
  * Calculate bone rotation from two landmarks
  */
-const calculateRotation = (from, to) => {
+const calculateRotation = (from, to, boneName = '') => {
   const direction = new THREE.Vector3(
     to.x - from.x,
     -(to.y - from.y),
@@ -44,7 +49,7 @@ const calculateRotation = (from, to) => {
   ).normalize();
 
   const quaternion = new THREE.Quaternion();
-  quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), direction);
+  let baseDir = new THREE.Vector3(0, -1, 0); if (boneName.includes("LeftArm")) baseDir.set(-1,0,0); else if (boneName.includes("RightArm")) baseDir.set(1,0,0); else if (boneName.includes("Leg") || boneName.includes("Foot")) baseDir.set(0,-1,0); quaternion.setFromUnitVectors(baseDir, direction); if (boneName.includes("Leg")) console.log(boneName, "rot:", euler.x?.toFixed(2), euler.y?.toFixed(2), euler.z?.toFixed(2));
 
   const euler = new THREE.Euler();
   euler.setFromQuaternion(quaternion);
@@ -93,11 +98,11 @@ const LiveAvatar = ({ landmarks, avatarUrl }) => {
       const boneObj = findBone(modelRef.current, bone);
       
       if (boneObj && landmarks[from] && landmarks[to]) {
-        if (landmarks[from].visibility < 0.3 || landmarks[to].visibility < 0.3) {
+        if (landmarks[from].visibility < 0.0001 || landmarks[to].visibility < 0.0001) {
           return;
         }
 
-        const rotation = calculateRotation(landmarks[from], landmarks[to]);
+        const rotation = calculateRotation(landmarks[from], landmarks[to], bone);
         
         // Smooth interpolation
         boneObj.rotation.x = THREE.MathUtils.lerp(boneObj.rotation.x, rotation.x, 0.4);
@@ -153,7 +158,7 @@ const LiveMoCapAvatar = ({
 }) => {
   // Use backend URL for default avatar
   const backendUrl = process.env.REACT_APP_BACKEND_URL || '';
-  const defaultAvatarUrl = avatarUrl || `${backendUrl}/static/uploads/me_wit_locks.jpg_avatar.glb`;
+  const defaultAvatarUrl = avatarUrl || `${backendUrl}/static/models/xbot_avatar.glb`;
   
   const videoRef = useRef(null);
   const [landmarks, setLandmarks] = useState(null);

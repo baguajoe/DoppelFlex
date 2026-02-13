@@ -1,7 +1,10 @@
-// src/component/AvatarCustomizer.js
+// src/front/js/component/AvatarCustomizer.js
 import React, { useEffect, useRef, useState } from "react";
 import ModelViewer from "./ModelViewer";
 import ColorThief from "colorthief";
+
+// ─── Consistent model path ───
+const DEFAULT_MODEL = "/static/models/Y_Bot.glb";
 
 const AvatarCustomizer = ({ onCustomize }) => {
   const [height, setHeight] = useState(170);
@@ -9,9 +12,11 @@ const AvatarCustomizer = ({ onCustomize }) => {
   const [skinColor, setSkinColor] = useState("#f5cba7");
   const [outfitColor, setOutfitColor] = useState("#3498db");
   const [accessories, setAccessories] = useState("glasses");
-  const [modelUrl, setModelUrl] = useState("/rigged-avatar.glb");
+  const [modelUrl, setModelUrl] = useState(DEFAULT_MODEL);
   const [selfiePreview, setSelfiePreview] = useState(null);
   const fileInputRef = useRef();
+
+  const backendUrl = process.env.REACT_APP_BACKEND_URL || "";
 
   const handleSelfieUpload = (e) => {
     const file = e.target.files[0];
@@ -52,7 +57,7 @@ const AvatarCustomizer = ({ onCustomize }) => {
 
     const token = localStorage.getItem("token");
     if (token) {
-      await fetch(`${process.env.BACKEND_URL}/api/save-avatar-preset`, {
+      await fetch(`${backendUrl}/api/save-avatar-preset`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -131,9 +136,8 @@ const AvatarCustomizer = ({ onCustomize }) => {
           value={modelUrl}
           onChange={(e) => setModelUrl(e.target.value)}
         >
-          <option value="/rigged-avatar.glb">Rigged Avatar</option>
-          <option value="/alt-avatar.glb">Alternate Avatar</option>
-          <option value="/dancer-avatar.glb">Dancer Avatar</option>
+          <option value="/static/models/Y_Bot.glb">Y Bot</option>
+          <option value="/static/models/xbot_avatar_compressed.glb">X Bot</option>
         </select>
       </div>
 
