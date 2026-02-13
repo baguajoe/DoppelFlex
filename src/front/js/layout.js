@@ -65,10 +65,10 @@ const Layout = () => {
               <Route path="/account-settings" element={<AccountSettingsPage />} />
               <Route path="/my-outfits" element={<MyOutfitsPage />} />
               <Route path="/full-capture" element={<FullBodyCapturePage />} />
+              <Route path="/export-avatar" element={<AvatarExportPage />} />
               <Route path="/demo" element={<demo />} />
               <Route path="/single" element={<single />} />
               <Route path="*" element={<ErrorPage />} />
-              <Route path="/export-avatar" element={<AvatarExportPage />} />
             </Routes>
             <footer className="text-center mt-5 border-top pt-3">
               <p>© {new Date().getFullYear()} Avatar Creator</p>

@@ -5,9 +5,10 @@
 // simultaneously, both feeding into the same avatar.
 //
 // Features:
+//   - Single / Multi camera mode toggle via CameraManager
 //   - Side-by-side body and face capture panels
 //   - Live expression summary strip
-//   - Avatar model selector
+//   - Avatar model selector + custom GLB upload
 //   - Body tracking status + face tracking status
 //   - Links to related pages (replay, dance sync, sessions)
 //
@@ -17,6 +18,7 @@
 
 import React, { useRef, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
+import CameraManager from '../component/CameraManager';
 import MotionCaptureSystem from '../component/MotionCaptureSystem';
 import FacialCaptureSystem, { applyFaceToAvatar } from '../component/FacialCaptureSystem';
 import '../../styles/FullBodyCapturePage.css';
@@ -33,7 +35,27 @@ const FullBodyCapturePage = () => {
   const [faceExpressions, setFaceExpressions] = useState(null);
   const [bodyActive, setBodyActive] = useState(false);
   const [faceActive, setFaceActive] = useState(false);
+  const [cameraMode, setCameraMode] = useState('single');
+  const [streams, setStreams] = useState({ body: null, face: null, depth: null });
   const avatarSceneRef = useRef(null);
+
+  // ── Handle streams from CameraManager ──
+  const handleStreamsReady = useCallback((newStreams) => {
+    setStreams(newStreams);
+    console.log('[FullCap] Streams ready:', {
+      body: !!newStreams.body,
+      face: !!newStreams.face,
+      depth: !!newStreams.depth,
+    });
+  }, []);
+
+  // ── Handle camera mode change ──
+  const handleModeChange = useCallback((newMode) => {
+    setCameraMode(newMode);
+    setBodyActive(false);
+    setFaceActive(false);
+    setFaceExpressions(null);
+  }, []);
 
   // ── Handle face expression data from FacialCaptureSystem ──
   const handleFaceFrame = useCallback((expressions) => {
@@ -47,10 +69,8 @@ const FullBodyCapturePage = () => {
   }, []);
 
   // ── Handle body pose data from MotionCaptureSystem ──
-  const handlePoseFrame = useCallback((frame) => {
+  const handlePoseFrame = useCallback(() => {
     setBodyActive(true);
-    // Body data is already applied by MotionCaptureSystem → AvatarRigPlayer3D
-    // This callback is for any additional processing (recording, analytics, etc.)
   }, []);
 
   // ── Handle custom avatar upload ──
@@ -103,6 +123,28 @@ const FullBodyCapturePage = () => {
           <span className={`fullcap__toolbar-badge ${faceActive ? 'fullcap__toolbar-badge--active' : 'fullcap__toolbar-badge--inactive'}`}>
             🎭 Face {faceActive ? 'Active' : 'Off'}
           </span>
+          <span className={`fullcap__toolbar-badge ${cameraMode === 'multi' ? 'fullcap__toolbar-badge--active' : 'fullcap__toolbar-badge--inactive'}`}>
+            📷 {cameraMode === 'multi' ? 'Multi-Cam' : 'Single-Cam'}
+          </span>
+        </div>
+      </div>
+
+      {/* Camera Manager — Single / Multi Toggle + Device Selection */}
+      <div className="fullcap__section">
+        <div className="fullcap__section-header">
+          <h3 className="fullcap__section-title">📷 Camera Setup</h3>
+          <span className="fullcap__section-status">
+            {cameraMode === 'single' ? 'One camera for body + face' : 'Separate cameras for body and face'}
+          </span>
+        </div>
+        <div className="fullcap__section-body">
+          <CameraManager
+            initialMode="single"
+            onStreamsReady={handleStreamsReady}
+            onModeChange={handleModeChange}
+            showPreviews={true}
+            allowDepthCamera={false}
+          />
         </div>
       </div>
 
@@ -122,6 +164,7 @@ const FullBodyCapturePage = () => {
               showWebcam={true}
               smoothingPreset="balanced"
               onPoseFrame={handlePoseFrame}
+              externalStream={streams.body}
             />
           </div>
         </div>
@@ -141,6 +184,7 @@ const FullBodyCapturePage = () => {
               showDebugBars={true}
               showSnapshot={false}
               initialSensitivity="medium"
+              externalStream={streams.face}
             />
           </div>
         </div>
@@ -166,13 +210,13 @@ const FullBodyCapturePage = () => {
       <div className="fullcap__help">
         <h4 className="fullcap__help-title">📋 How to Use</h4>
         <ol className="fullcap__help-list">
-          <li><strong>Start Camera</strong> (body panel) — enables full-body pose tracking via webcam</li>
-          <li><strong>Start Face Capture</strong> (face panel) — enables facial expression tracking</li>
-          <li>Stand back ~6 feet so your full body is visible for body tracking</li>
-          <li>Face the camera directly with good lighting for best facial tracking</li>
-          <li>Both systems run independently — use one or both simultaneously</li>
-          <li>Hit <strong>Record</strong> on either panel to save motion/expression data</li>
-          <li>Export recordings as JSON for replay or further processing</li>
+          <li><strong>Choose camera mode</strong> — Single uses one webcam for both. Multi assigns separate cameras.</li>
+          <li><strong>Select camera(s)</strong> — Pick which device for body and/or face tracking.</li>
+          <li><strong>Start Camera(s)</strong> — Opens the selected camera streams.</li>
+          <li><strong>Start body + face capture</strong> — Click Start in each panel to begin tracking.</li>
+          <li>Stand back ~6 feet for body tracking, face the camera for facial tracking.</li>
+          <li>In multi-camera mode, use a wide-angle cam for body and a close-up cam for face.</li>
+          <li>Hit <strong>Record</strong> on either panel to save motion/expression data as JSON.</li>
         </ol>
       </div>
 
