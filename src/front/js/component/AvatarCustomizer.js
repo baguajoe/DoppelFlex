@@ -1,10 +1,26 @@
 // src/front/js/component/AvatarCustomizer.js
 import React, { useEffect, useRef, useState } from "react";
 import ModelViewer from "./ModelViewer";
-import ColorThief from "colorthief";
+
+// Inline dominant color extraction (replaces colorthief to avoid Babel ES6 class issue)
+function getDominantColor(canvas) {
+  const ctx = canvas.getContext("2d");
+  const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+  let r = 0, g = 0, b = 0, count = 0;
+  for (let i = 0; i < data.length; i += 16) { // sample every 4th pixel
+    if (data[i + 3] < 128) continue; // skip transparent
+    r += data[i];
+    g += data[i + 1];
+    b += data[i + 2];
+    count++;
+  }
+  if (count === 0) return [128, 128, 128];
+  return [Math.round(r / count), Math.round(g / count), Math.round(b / count)];
+}
 
 // ─── Consistent model path ───
-const DEFAULT_MODEL = "/static/models/Y_Bot.glb";
+const BACKEND = process.env.REACT_APP_BACKEND_URL || '';
+const DEFAULT_MODEL = `${BACKEND}/static/models/Y_Bot.glb`;
 
 const AvatarCustomizer = ({ onCustomize }) => {
   const [height, setHeight] = useState(170);
@@ -34,8 +50,7 @@ const AvatarCustomizer = ({ onCustomize }) => {
         const ctx = canvas.getContext("2d");
         ctx.drawImage(img, 0, 0);
 
-        const colorThief = new ColorThief();
-        const dominant = colorThief.getColor(canvas);
+        const dominant = getDominantColor(canvas);
         const hexColor = `#${dominant.map((c) => c.toString(16).padStart(2, "0")).join("")}`;
         setSkinColor(hexColor);
         setSelfiePreview(reader.result);

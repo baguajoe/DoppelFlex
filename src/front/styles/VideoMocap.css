@@ -1,0 +1,449 @@
+/* src/front/styles/VideoMocap.css */
+
+/* ─── Container ─── */
+.vmocap {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+  background-color: #0a0a0f;
+  color: #e0e0e0;
+  font-family: 'Inter', 'Segoe UI', sans-serif;
+  min-height: 100vh;
+}
+
+.vmocap__title {
+  font-size: 26px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.vmocap__subtitle {
+  font-size: 14px;
+  color: #888;
+  margin: 0;
+}
+
+/* ─── Upload Zone ─── */
+.vmocap__upload-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  background-color: #111118;
+  border: 2px dashed #2a2a3e;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.vmocap__upload-zone:hover {
+  border-color: #8b5cf6;
+  background-color: #13131d;
+}
+
+.vmocap__upload-zone--active {
+  border-color: #4ade80;
+  background-color: #0d1a0d;
+}
+
+.vmocap__upload-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+  opacity: 0.5;
+}
+
+.vmocap__upload-text {
+  font-size: 15px;
+  color: #aaa;
+  margin-bottom: 4px;
+}
+
+.vmocap__upload-hint {
+  font-size: 12px;
+  color: #666;
+}
+
+.vmocap__upload-input {
+  display: none;
+}
+
+.vmocap__upload-filename {
+  margin-top: 10px;
+  font-size: 13px;
+  color: #4ade80;
+  font-weight: 500;
+}
+
+/* ─── Toolbar ─── */
+.vmocap__toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 16px;
+  background-color: #111118;
+  border-radius: 10px;
+  border: 1px solid #1a1a2e;
+  flex-wrap: wrap;
+}
+
+.vmocap__toolbar-label {
+  font-size: 13px;
+  color: #aaa;
+  white-space: nowrap;
+}
+
+.vmocap__toolbar-select {
+  background-color: #1e1e2e;
+  color: #ccc;
+  border: 1px solid #333;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+.vmocap__toolbar-group {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* ─── Main Layout ─── */
+.vmocap__main {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 1024px) {
+  .vmocap__main {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ─── Section Cards ─── */
+.vmocap__section {
+  background-color: #0d0d14;
+  border-radius: 12px;
+  border: 1px solid #1a1a2e;
+  overflow: hidden;
+}
+
+.vmocap__section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background-color: #111118;
+  border-bottom: 1px solid #1a1a2e;
+}
+
+.vmocap__section-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.vmocap__section-status {
+  font-size: 11px;
+  color: #888;
+}
+
+.vmocap__section-body {
+  padding: 12px;
+}
+
+/* ─── Video Player ─── */
+.vmocap__video-container {
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: #000;
+}
+
+.vmocap__video {
+  width: 100%;
+  display: block;
+  border-radius: 8px;
+}
+
+.vmocap__video-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* ─── Canvas (pose skeleton overlay) ─── */
+.vmocap__canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* ─── Progress Bar ─── */
+.vmocap__progress {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.vmocap__progress-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #888;
+}
+
+.vmocap__progress-track {
+  width: 100%;
+  height: 10px;
+  background-color: #1e1e2e;
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.vmocap__progress-fill {
+  height: 100%;
+  border-radius: 5px;
+  transition: width 0.15s ease-out;
+  background: linear-gradient(90deg, #8b5cf6, #4ade80);
+}
+
+.vmocap__progress-stats {
+  display: flex;
+  gap: 16px;
+  font-size: 11px;
+  color: #666;
+}
+
+/* ─── Processing Status ─── */
+.vmocap__status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.vmocap__status--processing {
+  background-color: rgba(139, 92, 246, 0.08);
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  color: #a78bfa;
+}
+
+.vmocap__status--complete {
+  background-color: rgba(74, 222, 128, 0.08);
+  border: 1px solid rgba(74, 222, 128, 0.2);
+  color: #4ade80;
+}
+
+.vmocap__status--error {
+  background-color: rgba(248, 113, 113, 0.08);
+  border: 1px solid rgba(248, 113, 113, 0.2);
+  color: #f87171;
+}
+
+.vmocap__spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(139, 92, 246, 0.3);
+  border-top-color: #8b5cf6;
+  border-radius: 50%;
+  animation: vmocap-spin 0.8s linear infinite;
+}
+
+@keyframes vmocap-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ─── Playback Controls ─── */
+.vmocap__playback {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.vmocap__playback-time {
+  font-size: 12px;
+  color: #888;
+  font-family: 'JetBrains Mono', monospace;
+  min-width: 80px;
+}
+
+.vmocap__scrubber {
+  flex: 1;
+  min-width: 150px;
+  accent-color: #8b5cf6;
+}
+
+.vmocap__speed-select {
+  background-color: #1e1e2e;
+  color: #ccc;
+  border: 1px solid #333;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+/* ─── Actions ─── */
+.vmocap__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.vmocap__btn {
+  padding: 10px 18px;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.vmocap__btn:hover {
+  transform: scale(1.02);
+}
+
+.vmocap__btn:active {
+  transform: scale(0.98);
+}
+
+.vmocap__btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.vmocap__btn--primary {
+  background-color: #8b5cf6;
+  color: white;
+}
+
+.vmocap__btn--primary:hover:not(:disabled) {
+  background-color: #7c3aed;
+}
+
+.vmocap__btn--success {
+  background-color: #4ade80;
+  color: #0a0a0f;
+}
+
+.vmocap__btn--success:hover:not(:disabled) {
+  background-color: #22c55e;
+}
+
+.vmocap__btn--danger {
+  background-color: #ef4444;
+  color: white;
+}
+
+.vmocap__btn--ghost {
+  background-color: transparent;
+  color: #888;
+  border: 1px solid #333;
+}
+
+.vmocap__btn--ghost:hover:not(:disabled) {
+  background-color: #1e1e2e;
+  color: #ccc;
+}
+
+/* ─── Frame Info ─── */
+.vmocap__frame-info {
+  display: flex;
+  gap: 16px;
+  padding: 10px 14px;
+  background-color: #111118;
+  border-radius: 8px;
+  border: 1px solid #1a1a2e;
+  font-size: 12px;
+  color: #888;
+  flex-wrap: wrap;
+}
+
+.vmocap__frame-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.vmocap__frame-stat-label {
+  font-size: 10px;
+  color: #555;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.vmocap__frame-stat-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #ccc;
+}
+
+/* ─── Error ─── */
+.vmocap__error {
+  padding: 10px 14px;
+  background-color: #1a0000;
+  border: 1px solid #ef4444;
+  border-radius: 8px;
+  color: #f87171;
+  font-size: 13px;
+}
+
+/* ─── Track Type Selector ─── */
+.vmocap__track-types {
+  display: flex;
+  gap: 8px;
+}
+
+.vmocap__track-chip {
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid #333;
+  background-color: #1e1e2e;
+  color: #888;
+  transition: all 0.2s;
+}
+
+.vmocap__track-chip--active {
+  background-color: rgba(139, 92, 246, 0.15);
+  border-color: #8b5cf6;
+  color: #a78bfa;
+}
+
+.vmocap__track-chip:hover {
+  border-color: #555;
+}
+
+/* ─── Responsive ─── */
+@media (max-width: 768px) {
+  .vmocap {
+    padding: 12px;
+  }
+
+  .vmocap__actions {
+    flex-direction: column;
+  }
+
+  .vmocap__btn {
+    width: 100%;
+  }
+
+  .vmocap__toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

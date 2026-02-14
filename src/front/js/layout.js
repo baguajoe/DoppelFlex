@@ -30,6 +30,7 @@ import AccountSettingsPage from "./pages/AccountSettingsPage";
 import ClothingMatchPage from './pages/ClothingMatchPage';
 import MyOutfitsPage from "./pages/MyOutfitsPage";
 import FullBodyCapturePage from './pages/FullBodyCapturePage';
+import FaceCapturePage from './pages/FaceCapturePage';
 import demo from './pages/demo.js';
 import single from './pages/single.js';
 
@@ -65,6 +66,7 @@ const Layout = () => {
               <Route path="/account-settings" element={<AccountSettingsPage />} />
               <Route path="/my-outfits" element={<MyOutfitsPage />} />
               <Route path="/full-capture" element={<FullBodyCapturePage />} />
+              <Route path="/face-capture" element={<FaceCapturePage />} />
               <Route path="/export-avatar" element={<AvatarExportPage />} />
               <Route path="/demo" element={<demo />} />
               <Route path="/single" element={<single />} />

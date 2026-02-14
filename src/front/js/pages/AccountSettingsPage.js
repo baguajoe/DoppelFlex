@@ -1,118 +1,194 @@
 // src/front/js/pages/AccountSettingsPage.js
-import React, { useState, useEffect, useContext } from "react";
-import { Context } from "../store/appContext";
+// Fixed: REACT_APP_BACKEND_URL, dark theme, proper layout
+
+import React, { useState, useEffect, useContext } from 'react';
+import { Context } from '../store/appContext';
+import '../../styles/Wardrobe.css';
+
+const BACKEND = process.env.REACT_APP_BACKEND_URL || '';
 
 const AccountSettingsPage = () => {
-  const { store, actions } = useContext(Context);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [message, setMessage] = useState("");
-  const [cardInfo, setCardInfo] = useState("");
+  const { store } = useContext(Context);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [message, setMessage] = useState('');
+  const [cardInfo, setCardInfo] = useState('');
 
   useEffect(() => {
     const loadUserInfo = async () => {
-      const res = await fetch(process.env.BACKEND_URL + "/api/account-info", {
-        headers: {
-          Authorization: "Bearer " + localStorage.getItem("token"),
-        },
-      });
-      const data = await res.json();
-      if (res.ok) setEmail(data.email);
+      try {
+        const res = await fetch(`${BACKEND}/api/account-info`, {
+          headers: { Authorization: 'Bearer ' + localStorage.getItem('token') },
+        });
+        const data = await res.json();
+        if (res.ok) setEmail(data.email);
+      } catch {
+        // Backend not reachable — skip
+      }
     };
     loadUserInfo();
   }, []);
 
   const handleEmailChange = async (e) => {
     e.preventDefault();
-    const res = await fetch(process.env.BACKEND_URL + "/api/update-email", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: "Bearer " + localStorage.getItem("token"),
-      },
-      body: JSON.stringify({ email }),
-    });
-    setMessage(res.ok ? "✅ Email updated" : "❌ Failed to update email");
+    try {
+      const res = await fetch(`${BACKEND}/api/update-email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + localStorage.getItem('token'),
+        },
+        body: JSON.stringify({ email }),
+      });
+      setMessage(res.ok ? '✅ Email updated' : '❌ Failed to update email');
+    } catch {
+      setMessage('⚠️ Backend not reachable');
+    }
   };
 
   const handlePasswordChange = async (e) => {
     e.preventDefault();
     if (newPassword !== confirmPassword) {
-      setMessage("❌ Passwords do not match");
+      setMessage('❌ Passwords do not match');
       return;
     }
-    const res = await fetch(process.env.BACKEND_URL + "/api/update-password", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: "Bearer " + localStorage.getItem("token"),
-      },
-      body: JSON.stringify({ current_password: password, new_password: newPassword }),
-    });
-    setMessage(res.ok ? "✅ Password updated" : "❌ Failed to update password");
+    try {
+      const res = await fetch(`${BACKEND}/api/update-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + localStorage.getItem('token'),
+        },
+        body: JSON.stringify({ current_password: password, new_password: newPassword }),
+      });
+      setMessage(res.ok ? '✅ Password updated' : '❌ Failed to update password');
+    } catch {
+      setMessage('⚠️ Backend not reachable');
+    }
   };
 
   const handleCardSave = (e) => {
     e.preventDefault();
-    // Placeholder — integrate with Stripe later
-    setMessage("💳 Card info saved (placeholder)");
+    setMessage('💳 Card info saved (placeholder — integrate Stripe)');
   };
 
   return (
-    <div className="container mt-4">
-      <h2>Account Settings</h2>
+    <div className="df-page">
+      <div className="df-page__header">
+        <h2 className="df-page__title">⚙️ Account Settings</h2>
+        <p className="df-page__subtitle">Update your email, password, and payment information.</p>
+      </div>
 
-      <form onSubmit={handleEmailChange} className="mb-4">
-        <label>Email:</label>
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="form-control mb-2"
-        />
-        <button className="btn btn-primary">Update Email</button>
-      </form>
+      <div className="df-grid-2">
+        {/* Email */}
+        <div className="df-card">
+          <div className="df-card__header">
+            <h3 className="df-card__title">📧 Email</h3>
+          </div>
+          <div className="df-card__body">
+            <form onSubmit={handleEmailChange}>
+              <div className="df-form-group" style={{ marginBottom: '12px' }}>
+                <label className="df-label">Email Address</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="df-input"
+                  placeholder="your@email.com"
+                />
+              </div>
+              <button type="submit" className="df-btn df-btn--primary">Update Email</button>
+            </form>
+          </div>
+        </div>
 
-      <form onSubmit={handlePasswordChange} className="mb-4">
-        <label>Current Password:</label>
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="form-control mb-2"
-        />
-        <label>New Password:</label>
-        <input
-          type="password"
-          value={newPassword}
-          onChange={(e) => setNewPassword(e.target.value)}
-          className="form-control mb-2"
-        />
-        <label>Confirm New Password:</label>
-        <input
-          type="password"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          className="form-control mb-2"
-        />
-        <button className="btn btn-warning">Update Password</button>
-      </form>
+        {/* Password */}
+        <div className="df-card">
+          <div className="df-card__header">
+            <h3 className="df-card__title">🔒 Password</h3>
+          </div>
+          <div className="df-card__body">
+            <form onSubmit={handlePasswordChange}>
+              <div className="df-form-group" style={{ marginBottom: '12px' }}>
+                <label className="df-label">Current Password</label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="df-input"
+                />
+              </div>
+              <div className="df-form-group" style={{ marginBottom: '12px' }}>
+                <label className="df-label">New Password</label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="df-input"
+                />
+              </div>
+              <div className="df-form-group" style={{ marginBottom: '12px' }}>
+                <label className="df-label">Confirm New Password</label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="df-input"
+                />
+              </div>
+              <button type="submit" className="df-btn df-btn--warning">Update Password</button>
+            </form>
+          </div>
+        </div>
 
-      <form onSubmit={handleCardSave} className="mb-4">
-        <label>Card Info (placeholder):</label>
-        <input
-          type="text"
-          value={cardInfo}
-          onChange={(e) => setCardInfo(e.target.value)}
-          className="form-control mb-2"
-          placeholder="Card number or payment method"
-        />
-        <button className="btn btn-info">Save Card Info</button>
-      </form>
+        {/* Payment */}
+        <div className="df-card">
+          <div className="df-card__header">
+            <h3 className="df-card__title">💳 Payment</h3>
+            <span className="df-card__badge df-card__badge--purple">Placeholder</span>
+          </div>
+          <div className="df-card__body">
+            <form onSubmit={handleCardSave}>
+              <div className="df-form-group" style={{ marginBottom: '12px' }}>
+                <label className="df-label">Card Info</label>
+                <input
+                  type="text"
+                  value={cardInfo}
+                  onChange={(e) => setCardInfo(e.target.value)}
+                  className="df-input"
+                  placeholder="Integrate with Stripe checkout"
+                />
+              </div>
+              <button type="submit" className="df-btn df-btn--ghost">Save Card Info</button>
+            </form>
+          </div>
+        </div>
 
-      {message && <p className="mt-3">{message}</p>}
+        {/* Plan Info */}
+        <div className="df-card">
+          <div className="df-card__header">
+            <h3 className="df-card__title">📋 Subscription</h3>
+          </div>
+          <div className="df-card__body">
+            <p style={{ color: '#888', fontSize: '13px' }}>
+              Current Plan: <strong style={{ color: '#a78bfa' }}>{store?.user?.subscription_plan || 'Basic'}</strong>
+            </p>
+            <a href="/stripe-pricing" className="df-btn df-btn--primary df-btn--sm" style={{ textDecoration: 'none' }}>
+              ✦ Upgrade Plan
+            </a>
+          </div>
+        </div>
+      </div>
+
+      {message && (
+        <div className={`df-status ${message.startsWith('✅') ? 'df-status--success' : message.startsWith('💳') ? 'df-status--info' : 'df-status--error'}`}
+          style={{ marginTop: '20px' }}
+        >
+          {message}
+        </div>
+      )}
     </div>
   );
 };

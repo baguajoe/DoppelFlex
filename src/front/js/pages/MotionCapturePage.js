@@ -1,26 +1,29 @@
 // src/front/js/pages/MotionCapturePage.js
-// Updated to use the new LiveMoCapAvatar component
+// Updated to use LiveMoCapAvatar component
+// Fixed: dark theme styling, REACT_APP_BACKEND_URL consistency
 
 import React, { useState, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import LiveMoCapAvatar from '../component/LiveMoCapAvatar';
+import '../../styles/Wardrobe.css';
 
 const MotionCapturePage = () => {
-  // Use backend URL for static files
   const backendUrl = process.env.REACT_APP_BACKEND_URL || '';
   const defaultAvatar = `${backendUrl}/static/models/xbot_avatar.glb`;
-  
+
   const [avatarUrl, setAvatarUrl] = useState(defaultAvatar);
   const [showVideo, setShowVideo] = useState(true);
   const [saveStatus, setSaveStatus] = useState('');
   const [lastFrameData, setLastFrameData] = useState(null);
+  const [showDebug, setShowDebug] = useState(false);
 
   // Available avatar models
   const avatarModels = [
-    { name: 'Default Avatar', url: `${backendUrl}/static/models/xbot_avatar.glb` },
-    { name: 'Rigged Avatar', url: `${backendUrl}/static/models/xbot_avatar.glb` },
+    { name: 'X Bot', url: `${backendUrl}/static/models/xbot_avatar.glb` },
+    { name: 'Y Bot', url: `${backendUrl}/static/models/Y_Bot.glb` },
   ];
 
-  // Handle each frame (optional - for sending to backend)
+  // Handle each frame (optional — for sending to backend)
   const handleFrame = useCallback((frameData) => {
     setLastFrameData(frameData);
   }, []);
@@ -28,16 +31,16 @@ const MotionCapturePage = () => {
   // Save session to backend
   const handleSaveSession = async (frames) => {
     if (!frames || frames.length === 0) {
-      setSaveStatus('❌ No frames to save');
+      setSaveStatus('No frames to save');
       return;
     }
 
-    setSaveStatus('⏳ Saving...');
+    setSaveStatus('saving');
 
     try {
       const userId = localStorage.getItem('user_id') || '1';
-      
-      const response = await fetch(`${backendUrl}/save-motion-session`, {
+
+      const response = await fetch(`${backendUrl}/api/save-motion-session`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -48,7 +51,7 @@ const MotionCapturePage = () => {
       });
 
       const data = await response.json();
-      
+
       if (response.ok) {
         setSaveStatus(`✅ Saved! Session ID: ${data.id}`);
       } else {
@@ -61,64 +64,77 @@ const MotionCapturePage = () => {
   };
 
   return (
-    <div className="container mt-4">
-      <h2>🎥 Live Motion Capture</h2>
-      <p className="text-muted">
-        Capture your movements in real-time and see them applied to a 3D avatar.
-      </p>
+    <div className="df-page">
+      <div className="df-page__header">
+        <h2 className="df-page__title">🎥 Live Motion Capture</h2>
+        <p className="df-page__subtitle">
+          Capture your movements in real-time and see them applied to a 3D avatar.
+        </p>
+      </div>
 
-      {/* Settings Row */}
-      <div className="row mb-4">
-        <div className="col-md-4">
-          <label className="form-label">Avatar Model:</label>
-          <select
-            className="form-select"
-            value={avatarUrl}
-            onChange={(e) => setAvatarUrl(e.target.value)}
-          >
-            {avatarModels.map((model) => (
-              <option key={model.url} value={model.url}>
-                {model.name}
-              </option>
-            ))}
-          </select>
+      {/* ── Settings Row ── */}
+      <div className="df-card" style={{ marginBottom: '16px' }}>
+        <div className="df-card__header">
+          <h3 className="df-card__title">⚙️ Settings</h3>
         </div>
+        <div className="df-card__body">
+          <div className="df-form-row">
+            <div className="df-form-group">
+              <label className="df-label">Avatar Model</label>
+              <select
+                className="df-select"
+                value={avatarUrl}
+                onChange={(e) => setAvatarUrl(e.target.value)}
+              >
+                {avatarModels.map((model) => (
+                  <option key={model.url} value={model.url}>
+                    {model.name}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-        <div className="col-md-4">
-          <label className="form-label">Custom Avatar (GLB/GLTF):</label>
-          <input
-            type="file"
-            className="form-control"
-            accept=".glb,.gltf"
-            onChange={(e) => {
-              const file = e.target.files[0];
-              if (file) {
-                const url = URL.createObjectURL(file);
-                setAvatarUrl(url);
-              }
-            }}
-          />
-        </div>
+            <div className="df-form-group">
+              <label className="df-label">Custom Avatar (GLB/GLTF)</label>
+              <label className="df-file-label">
+                📂 Upload Model
+                <input
+                  type="file"
+                  accept=".glb,.gltf"
+                  className="df-file-input"
+                  onChange={(e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                      const url = URL.createObjectURL(file);
+                      setAvatarUrl(url);
+                    }
+                  }}
+                />
+              </label>
+            </div>
 
-        <div className="col-md-4 d-flex align-items-end">
-          <div className="form-check">
-            <input
-              type="checkbox"
-              className="form-check-input"
-              id="showVideo"
-              checked={showVideo}
-              onChange={(e) => setShowVideo(e.target.checked)}
-            />
-            <label className="form-check-label" htmlFor="showVideo">
-              Show webcam preview
-            </label>
+            <div className="df-form-group" style={{ justifyContent: 'flex-end' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', color: '#ccc' }}>
+                <input
+                  type="checkbox"
+                  checked={showVideo}
+                  onChange={(e) => setShowVideo(e.target.checked)}
+                  style={{ accentColor: '#8b5cf6' }}
+                />
+                Show webcam preview
+              </label>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Main MoCap Component */}
-      <div className="card">
-        <div className="card-body">
+      {/* ── Main MoCap Component ── */}
+      <div className="df-card" style={{ marginBottom: '16px' }}>
+        <div className="df-card__header">
+          <h3 className="df-card__title">📡 Live Capture</h3>
+          <span className="df-card__badge df-card__badge--green">Real-time</span>
+        </div>
+        <div className="df-card__body">
           <LiveMoCapAvatar
             avatarUrl={avatarUrl}
             showVideo={showVideo}
@@ -128,56 +144,81 @@ const MotionCapturePage = () => {
         </div>
       </div>
 
-      {/* Save Status */}
+      {/* ── Save Status ── */}
       {saveStatus && (
-        <div className={`alert mt-3 ${saveStatus.includes('✅') ? 'alert-success' : saveStatus.includes('❌') ? 'alert-danger' : 'alert-info'}`}>
-          {saveStatus}
+        <div
+          className={`df-status ${saveStatus.includes('✅') ? 'df-status--success' : saveStatus.includes('❌') ? 'df-status--error' : 'df-status--info'}`}
+          style={{ marginBottom: '16px' }}
+        >
+          {saveStatus === 'saving' ? (
+            <><div className="df-spinner" /> Saving session...</>
+          ) : (
+            saveStatus
+          )}
         </div>
       )}
 
-      {/* Instructions */}
-      <div className="card mt-4">
-        <div className="card-header">
-          <h5 className="mb-0">📖 How to Use</h5>
+      <div className="df-grid-2">
+        {/* ── How to Use ── */}
+        <div className="df-card">
+          <div className="df-card__header">
+            <h3 className="df-card__title">📖 How to Use</h3>
+          </div>
+          <div className="df-card__body">
+            <ol style={{ margin: 0, paddingLeft: '20px', color: '#bbb', fontSize: '13px', lineHeight: '2' }}>
+              <li><strong style={{ color: '#e0e0e0' }}>Start Camera</strong> — Click the green button to enable your webcam</li>
+              <li><strong style={{ color: '#e0e0e0' }}>Position Yourself</strong> — Stand back so your full body is visible</li>
+              <li><strong style={{ color: '#e0e0e0' }}>Move!</strong> — Your avatar will mirror your movements in real-time</li>
+              <li><strong style={{ color: '#e0e0e0' }}>Record</strong> — Click "Record" to capture your motion session</li>
+              <li><strong style={{ color: '#e0e0e0' }}>Download</strong> — Save your recording as JSON for later playback</li>
+            </ol>
+          </div>
         </div>
-        <div className="card-body">
-          <ol className="mb-0">
-            <li><strong>Start Camera</strong> - Click the green button to enable your webcam</li>
-            <li><strong>Position Yourself</strong> - Stand back so your full body is visible</li>
-            <li><strong>Move!</strong> - Your avatar will mirror your movements in real-time</li>
-            <li><strong>Record</strong> - Click "Record" to capture your motion session</li>
-            <li><strong>Download</strong> - Save your recording as JSON for later playback</li>
-          </ol>
+
+        {/* ── Tips ── */}
+        <div className="df-card">
+          <div className="df-card__header">
+            <h3 className="df-card__title">💡 Tips for Best Results</h3>
+          </div>
+          <div className="df-card__body">
+            <ul style={{ margin: 0, paddingLeft: '20px', color: '#bbb', fontSize: '13px', lineHeight: '2' }}>
+              <li>Use good lighting — avoid backlight (windows behind you)</li>
+              <li>Wear contrasting clothes (avoid patterns similar to background)</li>
+              <li>Keep your full body in frame for best tracking</li>
+              <li>Maintain a distance of 6–10 feet from the camera</li>
+              <li>A plain background improves detection accuracy</li>
+            </ul>
+          </div>
         </div>
       </div>
 
-      {/* Tips */}
-      <div className="card mt-3">
-        <div className="card-header">
-          <h5 className="mb-0">💡 Tips for Best Results</h5>
-        </div>
-        <div className="card-body">
-          <ul className="mb-0">
-            <li>Use good lighting - avoid backlight (windows behind you)</li>
-            <li>Wear contrasting clothes (avoid patterns similar to background)</li>
-            <li>Keep your full body in frame for best tracking</li>
-            <li>Maintain a distance of 6-10 feet from the camera</li>
-            <li>A plain background improves detection accuracy</li>
-          </ul>
-        </div>
-      </div>
-
-      {/* Debug Panel (collapsible) */}
+      {/* ── Debug Panel (collapsible) ── */}
       {lastFrameData && (
-        <details className="mt-4">
-          <summary className="text-muted" style={{ cursor: 'pointer' }}>
-            🔧 Debug Information
-          </summary>
-          <div className="card mt-2">
-            <div className="card-body">
-              <h6>Last Frame Data:</h6>
-              <pre style={{ maxHeight: '200px', overflow: 'auto', fontSize: '11px' }}>
-                Key Landmarks:
+        <div className="df-card" style={{ marginTop: '16px' }}>
+          <div
+            className="df-card__header"
+            style={{ cursor: 'pointer' }}
+            onClick={() => setShowDebug(!showDebug)}
+          >
+            <h3 className="df-card__title">🔧 Debug Information</h3>
+            <span className="df-card__badge df-card__badge--purple">
+              {showDebug ? '▲ Hide' : '▼ Show'}
+            </span>
+          </div>
+          {showDebug && (
+            <div className="df-card__body">
+              <label className="df-label">Last Frame — Key Landmarks</label>
+              <pre style={{
+                background: '#111118',
+                border: '1px solid #2a2a3e',
+                borderRadius: '8px',
+                padding: '12px',
+                color: '#4ade80',
+                fontSize: '11px',
+                maxHeight: '200px',
+                overflow: 'auto',
+                fontFamily: 'JetBrains Mono, monospace',
+              }}>
                 {JSON.stringify({
                   nose: lastFrameData.landmarks?.[0],
                   leftShoulder: lastFrameData.landmarks?.[11],
@@ -187,24 +228,30 @@ const MotionCapturePage = () => {
                 }, null, 2)}
               </pre>
             </div>
-          </div>
-        </details>
+          )}
+        </div>
       )}
 
-      {/* Quick Links */}
-      <div className="mt-4 d-flex gap-2 flex-wrap">
-        <a href="/motion-sessions" className="btn btn-outline-primary">
+      {/* ── Quick Links ── */}
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '16px' }}>
+        <Link to="/motion-sessions" className="df-btn df-btn--ghost df-btn--sm" style={{ textDecoration: 'none' }}>
           📂 View Saved Sessions
-        </a>
-        <a href="/replay-session" className="btn btn-outline-secondary">
+        </Link>
+        <Link to="/replay-session" className="df-btn df-btn--ghost df-btn--sm" style={{ textDecoration: 'none' }}>
           ▶️ Replay Sessions
-        </a>
-        <a href="/dance-sync" className="btn btn-outline-success">
+        </Link>
+        <Link to="/dance-sync" className="df-btn df-btn--ghost df-btn--sm" style={{ textDecoration: 'none' }}>
           🎵 Dance Sync Mode
-        </a>
-        <a href="/motion-from-video" className="btn btn-outline-info">
+        </Link>
+        <Link to="/motion-from-video" className="df-btn df-btn--ghost df-btn--sm" style={{ textDecoration: 'none' }}>
           🎬 MoCap from Video
-        </a>
+        </Link>
+        <Link to="/face-capture" className="df-btn df-btn--ghost df-btn--sm" style={{ textDecoration: 'none' }}>
+          😊 Face Capture
+        </Link>
+        <Link to="/full-capture" className="df-btn df-btn--ghost df-btn--sm" style={{ textDecoration: 'none' }}>
+          🧍 Full Body + Face
+        </Link>
       </div>
     </div>
   );

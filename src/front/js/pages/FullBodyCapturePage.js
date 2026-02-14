@@ -23,11 +23,12 @@ import MotionCaptureSystem from '../component/MotionCaptureSystem';
 import FacialCaptureSystem, { applyFaceToAvatar } from '../component/FacialCaptureSystem';
 import '../../styles/FullBodyCapturePage.css';
 
-const DEFAULT_MODEL = '/static/models/Y_Bot.glb';
+const BACKEND = process.env.REACT_APP_BACKEND_URL || '';
+const DEFAULT_MODEL = `${BACKEND}/static/models/Y_Bot.glb`;
 
 const AVAILABLE_MODELS = [
-  { name: 'Y Bot', url: '/static/models/Y_Bot.glb' },
-  { name: 'X Bot', url: '/static/models/xbot_avatar_compressed.glb' },
+  { name: 'Y Bot', url: `${BACKEND}/static/models/Y_Bot.glb` },
+  { name: 'X Bot', url: `${BACKEND}/static/models/xbot_avatar_compressed.glb` },
 ];
 
 const FullBodyCapturePage = () => {

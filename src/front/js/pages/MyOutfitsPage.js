@@ -1,190 +1,193 @@
 // src/front/js/pages/MyOutfitsPage.js
-import React, { useEffect, useState, useContext } from "react";
-import { Context } from "../store/appContext";
-import AvatarPreview from "../component/AvatarPreview";
-import { useNavigate } from "react-router-dom";
+// Reworked: dark theme, fixed env vars (REACT_APP_BACKEND_URL), card layout
+
+import React, { useEffect, useState, useContext } from 'react';
+import { Context } from '../store/appContext';
+import { useNavigate } from 'react-router-dom';
+import '../../styles/Wardrobe.css';
+
+const BACKEND = process.env.REACT_APP_BACKEND_URL || '';
 
 const MyOutfitsPage = () => {
-    const { store } = useContext(Context);
-    const [outfits, setOutfits] = useState([]);
-    const [selectedOutfit, setSelectedOutfit] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState("");
-    const navigate = useNavigate();
+  const { store } = useContext(Context);
+  const [outfits, setOutfits] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [status, setStatus] = useState('');
+  const navigate = useNavigate();
 
-    useEffect(() => {
-      const fetchOutfits = async () => {
-        if (!store.token) {
-          setError("❌ You must be logged in to view outfits.");
-          setLoading(false);
-          return;
-        }
-
-        try {
-          const res = await fetch(`${process.env.BACKEND_URL}/api/my-outfits`, {
-            headers: {
-              Authorization: `Bearer ${store.token}`,
-            },
-          });
-
-          if (!res.ok) throw new Error("Failed to fetch outfits.");
-          const data = await res.json();
-          setOutfits(data.outfits || []);
-        } catch (err) {
-          console.error(err);
-          setError("❌ Unable to load outfits.");
-        }
-
+  useEffect(() => {
+    const fetchOutfits = async () => {
+      if (!store?.token) {
+        setError('Log in to view your saved outfits.');
         setLoading(false);
-      };
-
-      fetchOutfits();
-    }, [store.token]);
-
-    const handleDownload = (outfit) => {
-      const link = document.createElement("a");
-      link.href = `${process.env.BACKEND_URL}/static/outfits/${outfit.file}`;
-      link.download = outfit.file;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    };
-
-    const handleFavorite = async (outfitId) => {
-      try {
-        const res = await fetch(`${process.env.BACKEND_URL}/api/favorite-outfit/${outfitId}`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${store.token}`,
-          },
-        });
-
-        if (!res.ok) throw new Error("Failed to favorite outfit.");
-        alert("⭐ Outfit favorited!");
-      } catch (err) {
-        console.error("Favorite failed:", err);
-        alert("Failed to favorite outfit.");
+        return;
       }
-    };
 
-    const handleExportCombined = async (outfitFile) => {
       try {
-        const res = await fetch(`${process.env.BACKEND_URL}/export-combined-avatar`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${store.token}`,
-          },
-          body: JSON.stringify({
-            avatar_id: store.userAvatarId, // replace with actual avatar ID logic
-            outfit_file: outfitFile,
-          }),
+        const res = await fetch(`${BACKEND}/api/my-outfits`, {
+          headers: { Authorization: `Bearer ${store.token}` },
         });
-
-        if (!res.ok) throw new Error("Export failed");
-
-        const blob = await res.blob();
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = "combined_avatar.glb";
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
+        if (!res.ok) throw new Error('Failed to fetch outfits.');
+        const data = await res.json();
+        setOutfits(data.outfits || []);
       } catch (err) {
-        console.error("Export error:", err);
-        alert("Failed to export combined avatar.");
+        console.error(err);
+        setError('Unable to load outfits from server.');
       }
+      setLoading(false);
     };
 
-    return (
-      <div className="container mt-4">
-        <h2>🧍‍♂️ My Saved Outfits</h2>
+    fetchOutfits();
+  }, [store?.token]);
 
-        {loading && <p>Loading outfits...</p>}
-        {error && <p className="text-danger">{error}</p>}
+  const handleDelete = async (id) => {
+    try {
+      const res = await fetch(`${BACKEND}/api/delete-outfit/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${store.token}` },
+      });
+      if (res.ok) {
+        setOutfits(outfits.filter((o) => o.id !== id));
+        setStatus('Outfit deleted.');
+      }
+    } catch {
+      setStatus('Failed to delete outfit.');
+    }
+  };
 
-        {!loading && !error && outfits.length === 0 && (
-          <p>No outfits saved yet.</p>
-        )}
+  const handleFavorite = async (id) => {
+    try {
+      const res = await fetch(`${BACKEND}/api/favorite-outfit/${id}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${store.token}` },
+      });
+      if (res.ok) setStatus('⭐ Outfit favorited!');
+    } catch {
+      setStatus('Failed to favorite.');
+    }
+  };
 
-        <div className="row">
-          {outfits.map((outfit, index) => (
-            <div key={index} className="col-md-4 mb-3">
-              <div className="card h-100">
-                <div className="card-body">
-                  <h5 className="card-title">{outfit.name}</h5>
-                  <p className="card-text text-muted">Style: {outfit.style}</p>
-                  <div className="d-flex gap-2 flex-wrap">
-                    <button
-                      className="btn btn-sm btn-outline-primary"
-                      onClick={() => setSelectedOutfit(outfit)}
-                    >
-                      Preview
-                    </button>
+  const handleDownload = (outfit) => {
+    const link = document.createElement('a');
+    link.href = `${BACKEND}/static/outfits/${outfit.file}`;
+    link.download = outfit.file;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  };
 
-                    <button
-                      className="btn btn-sm btn-success"
-                      onClick={() => handleDownload(outfit)}
-                    >
-                      Download
-                    </button>
+  const handleExport = async (outfitFile) => {
+    try {
+      const res = await fetch(`${BACKEND}/api/export-combined-avatar`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${store.token}`,
+        },
+        body: JSON.stringify({
+          avatar_id: store.userAvatarId,
+          outfit_file: outfitFile,
+        }),
+      });
+      if (!res.ok) throw new Error('Export failed');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'combined_avatar.glb';
+      a.click();
+    } catch {
+      setStatus('Export failed — check backend connection.');
+    }
+  };
 
-                    <button
-                      className="btn btn-sm btn-secondary"
-                      onClick={() => navigate(`/rig?outfit=${encodeURIComponent(outfit.file)}`)}
-                    >
-                      Rig Preview
-                    </button>
+  return (
+    <div className="df-page">
+      <div className="df-page__header">
+        <h2 className="df-page__title">👗 My Outfits</h2>
+        <p className="df-page__subtitle">
+          View, preview, and manage your saved outfits. Download or apply them to your avatar.
+        </p>
+      </div>
 
-                    <button
-                      className="btn btn-sm btn-dark"
-                      onClick={() => handleExportCombined(outfit.file)}
-                    >
-                      Export Avatar + Outfit
-                    </button>
+      {/* Status */}
+      {status && (
+        <div className={`df-status ${status.startsWith('⭐') || status.includes('deleted') ? 'df-status--success' : 'df-status--error'}`}
+          style={{ marginBottom: '16px' }}
+        >
+          {status}
+          <button onClick={() => setStatus('')} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'inherit', cursor: 'pointer' }}>✕</button>
+        </div>
+      )}
 
-                    <button
-                      className="btn btn-sm btn-warning"
-                      onClick={() => handleFavorite(outfit.id)}
-                    >
-                      ⭐ Favorite
-                    </button>
+      {/* Loading */}
+      {loading && (
+        <div className="df-loading">
+          <div className="df-spinner" />
+          Loading outfits...
+        </div>
+      )}
 
-                    <button
-                      className="btn btn-sm btn-danger"
-                      onClick={async () => {
-                        const res = await fetch(`${process.env.BACKEND_URL}/api/delete-outfit/${outfit.id}`, {
-                          method: "DELETE",
-                          headers: {
-                            Authorization: `Bearer ${store.token}`,
-                          },
-                        });
+      {/* Error */}
+      {error && (
+        <div className="df-status df-status--error">{error}</div>
+      )}
 
-                        if (res.ok) {
-                          setOutfits(outfits.filter((o) => o.id !== outfit.id));
-                        } else {
-                          alert("Failed to delete outfit.");
-                        }
-                      }}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
+      {/* Empty */}
+      {!loading && !error && outfits.length === 0 && (
+        <div className="df-card">
+          <div className="df-card__body">
+            <div className="df-empty">
+              <div className="df-empty__icon">🧵</div>
+              <div className="df-empty__text">No outfits saved yet</div>
+              <button
+                className="df-btn df-btn--primary"
+                style={{ marginTop: '16px' }}
+                onClick={() => navigate('/clothing-match')}
+              >
+                🔍 Find Outfits
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Outfit Grid */}
+      {outfits.length > 0 && (
+        <div className="df-grid-3">
+          {outfits.map((outfit) => (
+            <div key={outfit.id} className="df-outfit-card">
+              <h4 className="df-outfit-card__name">{outfit.name}</h4>
+              <p className="df-outfit-card__style">
+                {outfit.style || 'No style info'}
+              </p>
+              <div style={{ fontSize: '11px', color: '#555', fontFamily: 'monospace', marginBottom: '10px' }}>
+                {outfit.file}
+              </div>
+              <div className="df-outfit-card__actions">
+                <button className="df-btn df-btn--sm df-btn--primary" onClick={() => handleDownload(outfit)}>
+                  📥 Download
+                </button>
+                <button className="df-btn df-btn--sm df-btn--success" onClick={() => handleExport(outfit.file)}>
+                  🧍 Export w/ Avatar
+                </button>
+                <button className="df-btn df-btn--sm df-btn--warning" onClick={() => handleFavorite(outfit.id)}>
+                  ⭐
+                </button>
+                <button className="df-btn df-btn--sm df-btn--ghost" onClick={() => navigate(`/rig?outfit=${encodeURIComponent(outfit.file)}`)}>
+                  🦴 Rig
+                </button>
+                <button className="df-btn df-btn--sm df-btn--danger" onClick={() => handleDelete(outfit.id)}>
+                  🗑
+                </button>
               </div>
             </div>
           ))}
         </div>
-
-        {selectedOutfit && (
-          <div className="mt-5">
-            <h4>👕 Previewing: {selectedOutfit.name}</h4>
-            <AvatarPreview outfitFile={selectedOutfit.file} />
-          </div>
-        )}
-      </div>
-    );
+      )}
+    </div>
+  );
 };
 
 export default MyOutfitsPage;

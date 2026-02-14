@@ -27,7 +27,8 @@ const sidebarSections = [
       </svg>
     ),
     links: [
-      { to: "/motion", label: "Live Motion" },
+      { to: "/motion", label: "Body Capture" },
+      { to: "/face-capture", label: "Face Capture" },
       { to: "/motion-from-video", label: "From Video" },
       { to: "/dance-sync", label: "Dance Sync" },
       { to: "/beat-editor", label: "Beat Editor" },
