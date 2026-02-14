@@ -33,6 +33,9 @@ import ClothingMatchPage from './pages/ClothingMatchPage';
 import MyOutfitsPage from './pages/MyOutfitsPage';
 import FaceCapturePage from './pages/FaceCapturePage';
 import FullBodyCapturePage from './pages/FullBodyCapturePage';
+import IllustrationTo3DPage from './pages/IllustrationTo3DPage';
+import Live2DAvatarPage from './pages/Live2DAvatarPage';
+
 
 const Layout = () => {
   return (
@@ -50,11 +53,13 @@ const Layout = () => {
               <Route path="/rig" element={<RigAvatarPage />} />
               <Route path="/avatar-view" element={<AvatarViewPage />} />
               <Route path="/export-avatar" element={<AvatarExportPage />} />
+              <Route path="/illustration-to-3d" element={<IllustrationTo3DPage />} />
 
               {/* Motion Capture */}
               <Route path="/motion" element={<MotionCapturePage />} />
               <Route path="/face-capture" element={<FaceCapturePage />} />
               <Route path="/full-capture" element={<FullBodyCapturePage />} />
+              <Route path="/2d-avatar" element={<Live2DAvatarPage />} />
               <Route path="/motion-from-video" element={<MotionFromVideoPage />} />
               <Route path="/motion-sessions" element={<MotionSessionList />} />
               <Route path="/replay-session/:sessionId" element={<ReplayMotionSession />} />
@@ -112,4 +117,4 @@ const Layout = () => {
   );
 };
 
-export default injectContext(Layout);
+export default injectContext(Layout)

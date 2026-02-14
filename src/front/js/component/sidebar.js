@@ -1,156 +1,213 @@
 // src/front/js/component/sidebar.js
-// Restyled: Dark theme, categorized sections, active link highlighting
+import React, { useState } from "react";
+import { Link, useLocation } from "react-router-dom";
+import "../../styles/sidebar.css";
 
-import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
-
-const SECTIONS = [
+const sidebarSections = [
   {
-    label: 'Avatar',
-    items: [
-      { to: '/upload', icon: '📸', label: 'Upload' },
-      { to: '/customize', icon: '🎨', label: 'Customize' },
-      { to: '/avatar-view', icon: '🧍', label: 'View Avatar' },
-      { to: '/rig', icon: '🦴', label: 'Rig' },
-      { to: '/export-avatar', icon: '📦', label: 'Export' },
+    label: "Create",
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+        <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5z"/>
+      </svg>
+    ),
+    links: [
+      { to: "/upload", label: "Upload Selfie" },
+      { to: "/customize", label: "Customize" },
+      { to: "/rig", label: "Rig Avatar" },
+      { to: "/illustration-to-3d", label: "Drawing to 3D" },
+      { to: "/export-avatar", label: "Export" },
     ],
   },
   {
-    label: 'Motion Capture',
-    items: [
-      { to: '/motion', icon: '🎥', label: 'Body Capture' },
-      { to: '/face-capture', icon: '🎭', label: 'Face Capture' },
-      { to: '/full-capture', icon: '🧑', label: 'Full Body + Face' },
-      { to: '/motion-from-video', icon: '📹', label: 'From Video' },
-      { to: '/motion-sessions', icon: '🎞️', label: 'Sessions' },
+    label: "Motion Capture",
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+        <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+        <path d="M6.271 5.055a.5.5 0 0 1 .52.038l3.5 2.5a.5.5 0 0 1 0 .814l-3.5 2.5A.5.5 0 0 1 6 10.5v-5a.5.5 0 0 1 .271-.445z"/>
+      </svg>
+    ),
+    links: [
+      { to: "/motion", label: "Body Capture" },
+      { to: "/face-capture", label: "Face Capture" },
+      { to: "/full-capture", label: "Full Body + Face" },
+      { to: "/2d-avatar", label: "2D Motion Capture" },
+      { to: "/motion-from-video", label: "From Video" },
+      { to: "/motion-sessions", label: "Sessions" },
     ],
   },
   {
-    label: 'Music & Dance',
-    items: [
-      { to: '/dance-sync', icon: '💃', label: 'Dance Sync' },
-      { to: '/beat-editor', icon: '🎵', label: 'Beat Editor' },
-      { to: '/beatmap-editor', icon: '🗺️', label: 'BeatMap Editor' },
+    label: "Music & Dance",
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+        <path d="M6 13c0 1.105-1.12 2-2.5 2S1 14.105 1 13c0-1.104 1.12-2 2.5-2s2.5.896 2.5 2zm9-2c0 1.105-1.12 2-2.5 2s-2.5-.895-2.5-2c0-1.104 1.12-2 2.5-2s2.5.896 2.5 2z"/>
+        <path fillRule="evenodd" d="M14 11V2h.5a.5.5 0 0 0 0-1H6a.5.5 0 0 0 0 1h.5v9"/>
+      </svg>
+    ),
+    links: [
+      { to: "/dance-sync", label: "Dance Sync" },
+      { to: "/beat-editor", label: "Beat Editor" },
+      { to: "/beatmap-editor", label: "BeatMap Editor" },
     ],
   },
   {
-    label: 'Wardrobe',
-    items: [
-      { to: '/clothing-match', icon: '🧠', label: 'Style Match' },
-      { to: '/my-outfits', icon: '👕', label: 'My Outfits' },
+    label: "Wardrobe",
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+        <path d="M7.21.8C7.69.295 8 0 8 0c.109.363.234.708.371 1.038.812 1.946 2.073 3.35 3.197 4.6C12.878 7.096 14 8.345 14 10a6 6 0 0 1-12 0C2 6.668 5.58 2.517 7.21.8zm.413 1.021A31.25 31.25 0 0 0 5.171 4.91C3.806 6.505 3 8.14 3 10a5 5 0 0 0 10 0c0-1.185-.762-2.218-1.935-3.558C9.88 5.065 8.607 3.64 7.623 1.82z"/>
+      </svg>
+    ),
+    links: [
+      { to: "/clothing-match", label: "Clothing Match" },
+      { to: "/my-outfits", label: "My Outfits" },
+      { to: "/avatar-customization", label: "Style Editor" },
     ],
   },
   {
-    label: 'Account',
-    items: [
-      { to: '/profile', icon: '👤', label: 'Profile' },
-      { to: '/account-settings', icon: '⚙️', label: 'Settings' },
-      { to: '/stripe-pricing', icon: '💳', label: 'Plans' },
+    label: "Account",
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+        <path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/>
+        <path fillRule="evenodd" d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zm8-7a7 7 0 0 0-5.468 11.37C3.242 11.226 4.805 10 8 10s4.757 1.225 5.468 2.37A7 7 0 0 0 8 1z"/>
+      </svg>
+    ),
+    links: [
+      { to: "/profile", label: "Profile" },
+      { to: "/account-settings", label: "Settings" },
+      { to: "/video-upload", label: "Video Upload" },
     ],
   },
 ];
 
 const Sidebar = () => {
   const location = useLocation();
+  const [collapsed, setCollapsed] = useState(false);
+  const [openSections, setOpenSections] = useState({
+    Create: true,
+    "Motion Capture": false,
+    "Music & Dance": false,
+    Wardrobe: false,
+    Account: false,
+  });
+
+  const toggleSection = (label) => {
+    if (collapsed) return;
+    setOpenSections((prev) => ({ ...prev, [label]: !prev[label] }));
+  };
+
+  const isActive = (path) => location.pathname === path;
 
   return (
-    <div
-      className="df-sidebar"
-      style={{
-        width: '220px',
-        minHeight: 'calc(100vh - 56px)',
-        background: '#0a0a12',
-        borderRight: '1px solid #1a1a2e',
-        padding: '12px 0',
-        flexShrink: 0,
-        overflowY: 'auto',
-      }}
+    <aside
+      className={`df-sidebar ${collapsed ? "df-sidebar--collapsed" : ""}`}
     >
-      {/* Home link */}
-      <Link
-        to="/"
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          padding: '8px 16px',
-          margin: '0 8px 8px',
-          borderRadius: '8px',
-          textDecoration: 'none',
-          fontSize: '13px',
-          fontWeight: 700,
-          color: location.pathname === '/' ? '#e0e0e0' : '#888',
-          background: location.pathname === '/' ? '#1a1a2e' : 'transparent',
-          transition: 'background 0.15s',
-        }}
+      {/* Toggle button */}
+      <button
+        className="df-sidebar-toggle"
+        onClick={() => setCollapsed(!collapsed)}
+        title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
       >
-        <span>🏠</span> Home
-      </Link>
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 16 16"
+          fill="currentColor"
+          style={{
+            transform: collapsed ? "rotate(180deg)" : "none",
+            transition: "transform 0.2s ease",
+          }}
+        >
+          <path
+            fillRule="evenodd"
+            d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"
+          />
+        </svg>
+      </button>
 
-      {/* Sections */}
-      {SECTIONS.map((section) => (
-        <div key={section.label} style={{ marginBottom: '6px' }}>
-          {/* Section Label */}
-          <div style={{
-            fontSize: '10px',
-            fontWeight: 700,
-            textTransform: 'uppercase',
-            letterSpacing: '0.08em',
-            color: '#555',
-            padding: '10px 16px 4px',
-          }}>
-            {section.label}
-          </div>
-
-          {/* Links */}
-          {section.items.map((item) => {
-            const isActive = location.pathname === item.to;
-            return (
-              <Link
-                key={item.to}
-                to={item.to}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '7px 16px',
-                  margin: '1px 8px',
-                  borderRadius: '6px',
-                  textDecoration: 'none',
-                  fontSize: '13px',
-                  color: isActive ? '#e0e0e0' : '#888',
-                  background: isActive ? '#1a1a2e' : 'transparent',
-                  borderLeft: isActive ? '2px solid #a78bfa' : '2px solid transparent',
-                  transition: 'background 0.15s, color 0.15s, border-color 0.15s',
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActive) {
-                    e.currentTarget.style.background = '#111118';
-                    e.currentTarget.style.color = '#bbb';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActive) {
-                    e.currentTarget.style.background = 'transparent';
-                    e.currentTarget.style.color = '#888';
-                  }
-                }}
-              >
-                <span style={{ fontSize: '14px', width: '18px', textAlign: 'center' }}>{item.icon}</span>
-                <span>{item.label}</span>
-              </Link>
-            );
-          })}
+      {/* Brand */}
+      {!collapsed && (
+        <div className="df-sidebar-brand">
+          <Link to="/" style={{ textDecoration: "none" }}>
+            <span className="df-sidebar-brand-text">DoppelFlex</span>
+          </Link>
         </div>
-      ))}
+      )}
 
-      {/* Responsive: hide sidebar on small screens */}
-      <style>{`
-        @media (max-width: 768px) {
-          .df-sidebar { display: none !important; }
-        }
-      `}</style>
-    </div>
+      {/* Navigation */}
+      <nav className="df-sidebar-nav">
+        {sidebarSections.map((section) => (
+          <div key={section.label} className="df-sidebar-section">
+            {/* Section Header */}
+            <button
+              className={`df-sidebar-section-header ${
+                openSections[section.label] ? "open" : ""
+              }`}
+              onClick={() => toggleSection(section.label)}
+              title={collapsed ? section.label : undefined}
+            >
+              <span className="df-sidebar-section-icon">{section.icon}</span>
+              {!collapsed && (
+                <>
+                  <span className="df-sidebar-section-label">
+                    {section.label}
+                  </span>
+                  <svg
+                    className={`df-sidebar-section-chevron ${
+                      openSections[section.label] ? "open" : ""
+                    }`}
+                    width="12"
+                    height="12"
+                    viewBox="0 0 12 12"
+                    fill="currentColor"
+                  >
+                    <path
+                      d="M2.5 4.5l3.5 3.5 3.5-3.5"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      fill="none"
+                    />
+                  </svg>
+                </>
+              )}
+            </button>
+
+            {/* Section Links */}
+            {!collapsed && openSections[section.label] && (
+              <div className="df-sidebar-links">
+                {section.links.map((link) => (
+                  <Link
+                    key={link.to}
+                    to={link.to}
+                    className={`df-sidebar-link ${
+                      isActive(link.to) ? "active" : ""
+                    }`}
+                  >
+                    <span className="df-sidebar-link-indicator" />
+                    {link.label}
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </nav>
+
+      {/* Bottom section */}
+      {!collapsed && (
+        <div className="df-sidebar-footer">
+          <Link to="/stripe-pricing" className="df-sidebar-upgrade">
+            <div className="df-sidebar-upgrade-icon">✦</div>
+            <div>
+              <div className="df-sidebar-upgrade-title">Upgrade Plan</div>
+              <div className="df-sidebar-upgrade-desc">
+                Unlock all features
+              </div>
+            </div>
+          </Link>
+        </div>
+      )}
+    </aside>
   );
 };
 

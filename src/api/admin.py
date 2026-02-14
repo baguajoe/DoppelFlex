@@ -2,7 +2,7 @@ import os
 from flask_admin import Admin
 from flask_admin.contrib.sqla import ModelView
 
-from .models import db, User, Avatar, Customization, SubscriptionPlan, MotionCaptureSession, MotionFromVideo, RiggedAvatar  # ✅ Import all relevant models
+from api.models import db, User, Avatar, Customization, SubscriptionPlan, MotionCaptureSession, MotionFromVideo, RiggedAvatar, MocapSession2D, PuppetCharacter, IllustrationConversion  # ✅ Import all relevant models
 
 def setup_admin(app):
     app.secret_key = os.environ.get('FLASK_APP_KEY', 'sample key')
@@ -18,3 +18,6 @@ def setup_admin(app):
     admin.add_view(ModelView(MotionCaptureSession, db.session))
     admin.add_view(ModelView(MotionFromVideo, db.session))
     admin.add_view(ModelView(RiggedAvatar, db.session))
+    admin.add_view(ModelView(MocapSession2D, db.session))
+    admin.add_view(ModelView(PuppetCharacter, db.session))
+    admin.add_view(ModelView(IllustrationConversion, db.session))

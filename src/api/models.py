@@ -31,6 +31,8 @@ class UserUsage(db.Model):
     videos_rendered = db.Column(db.Integer, default=0)
     render_minutes = db.Column(db.Float, default=0.0)
     last_reset = db.Column(db.DateTime, default=datetime.utcnow)
+    mocap_2d_sessions = db.Column(db.Integer, default=0)
+    illustration_conversions = db.Column(db.Integer, default=0)
 
     # This sets up `user.usage` on the User model automatically
     user = db.relationship("User", backref=db.backref("usage", uselist=False))
@@ -264,4 +266,164 @@ class AvatarPreset(db.Model):
     def __repr__(self):
         return f"<AvatarPreset {self.id} - User {self.user_id}>"
     
+# --------------------------------------------------
+# ADD THESE TO YOUR EXISTING src/api/models.py
+# --------------------------------------------------
 
+# 2D Motion Capture Session
+class MocapSession2D(db.Model):
+    __tablename__ = 'mocap_session_2d'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    puppet_id = db.Column(db.Integer, db.ForeignKey('puppet_character.id'), nullable=True)
+    name = db.Column(db.String(120), default="Untitled Session")
+    source_type = db.Column(db.String(20), default="live")  # 'live' or 'video'
+
+    # Recording data
+    frame_count = db.Column(db.Integer, default=0)
+    duration_seconds = db.Column(db.Float, default=0.0)
+    fps = db.Column(db.Integer, default=30)
+    pose_data_url = db.Column(db.String(512))      # JSON file with body pose frames
+    face_data_url = db.Column(db.String(512))       # JSON file with facial mocap frames
+    combined_data_url = db.Column(db.String(512))   # Full export (pose + face combined)
+
+    # Export tracking
+    export_format = db.Column(db.String(20))        # 'json', 'sprite_data'
+    exported_file_url = db.Column(db.String(512))
+
+    # Audio sync (optional)
+    audio_filename = db.Column(db.String(255))
+    beat_timestamps = db.Column(db.JSON)
+
+    has_face_tracking = db.Column(db.Boolean, default=False)
+    has_body_tracking = db.Column(db.Boolean, default=True)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Relationships
+    user = db.relationship('User', backref='mocap_sessions_2d')
+    puppet = db.relationship('PuppetCharacter', backref='mocap_sessions')
+
+    def serialize(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "source_type": self.source_type,
+            "frame_count": self.frame_count,
+            "duration": self.duration_seconds,
+            "fps": self.fps,
+            "has_face": self.has_face_tracking,
+            "has_body": self.has_body_tracking,
+            "export_format": self.export_format,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+# 2D Puppet Character (built-in or custom uploaded)
+class PuppetCharacter(db.Model):
+    __tablename__ = 'puppet_character'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)  # null = built-in template
+    name = db.Column(db.String(120), nullable=False)
+    is_template = db.Column(db.Boolean, default=False)  # True = system-provided template
+
+    # Style config for built-in puppet (JSON)
+    style_config = db.Column(db.JSON)  # {skinColor, bodyColor, hairColor, etc.}
+
+    # Custom character part image URLs (for uploaded puppets)
+    head_image_url = db.Column(db.String(512))
+    torso_image_url = db.Column(db.String(512))
+    upper_arm_image_url = db.Column(db.String(512))
+    lower_arm_image_url = db.Column(db.String(512))
+    upper_leg_image_url = db.Column(db.String(512))
+    lower_leg_image_url = db.Column(db.String(512))
+    hand_image_url = db.Column(db.String(512))
+    foot_image_url = db.Column(db.String(512))
+
+    # Pivot point offsets per part (JSON) for precise rotation
+    pivot_config = db.Column(db.JSON)
+
+    thumbnail_url = db.Column(db.String(512))
+    is_favorite = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Relationships
+    user = db.relationship('User', backref='puppet_characters')
+
+    def serialize(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "is_template": self.is_template,
+            "style_config": self.style_config,
+            "has_custom_parts": any([
+                self.head_image_url, self.torso_image_url,
+                self.upper_arm_image_url, self.lower_arm_image_url,
+            ]),
+            "thumbnail_url": self.thumbnail_url,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+# Illustration to 3D Conversion
+class IllustrationConversion(db.Model):
+    __tablename__ = 'illustration_conversion'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    avatar_id = db.Column(db.Integer, db.ForeignKey('avatar.id'), nullable=True)  # links to Avatar if rigged
+
+    # Source
+    original_image_url = db.Column(db.String(512), nullable=False)
+    illustration_type = db.Column(db.String(20), nullable=False)  # 'head' or 'full_body'
+
+    # Generated outputs
+    depth_map_url = db.Column(db.String(512))
+    model_url = db.Column(db.String(512))           # exported 3D model file
+    export_format = db.Column(db.String(10))         # 'glb', 'obj', 'ply'
+
+    # Mesh stats
+    vertex_count = db.Column(db.Integer)
+    face_count = db.Column(db.Integer)
+    has_back_face = db.Column(db.Boolean, default=True)
+
+    # Processing
+    status = db.Column(db.String(20), default="pending")  # pending, processing, complete, failed
+    error_message = db.Column(db.Text)
+    processing_time_seconds = db.Column(db.Float)
+
+    # Rigging status (after conversion, user may rig it)
+    is_rigged = db.Column(db.Boolean, default=False)
+    rigged_avatar_id = db.Column(db.Integer, db.ForeignKey('rigged_avatar.id'), nullable=True)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Relationships
+    user = db.relationship('User', backref='illustration_conversions')
+    avatar = db.relationship('Avatar', backref='illustration_source')
+    rigged_avatar = db.relationship('RiggedAvatar', backref='illustration_source')
+
+    def serialize(self):
+        return {
+            "id": self.id,
+            "illustration_type": self.illustration_type,
+            "model_url": self.model_url,
+            "depth_map_url": self.depth_map_url,
+            "format": self.export_format,
+            "vertex_count": self.vertex_count,
+            "face_count": self.face_count,
+            "status": self.status,
+            "is_rigged": self.is_rigged,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+# --------------------------------------------------
+# ALSO UPDATE UserUsage to track new feature usage:
+# Add these columns to your existing UserUsage model:
+#
+#   mocap_2d_sessions = db.Column(db.Integer, default=0)
+#   illustration_conversions = db.Column(db.Integer, default=0)
+# --------------------------------------------------
