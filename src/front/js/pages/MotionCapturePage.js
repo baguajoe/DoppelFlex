@@ -134,11 +134,11 @@ const MotionCapturePage = () => {
           <h3 className="df-card__title">📡 Live Capture</h3>
           <span className="df-card__badge df-card__badge--green">Real-time</span>
         </div>
-        <div className="df-card__body">
+        <div className="df-card__body" style={{ minHeight: '520px' }}>
           <LiveMoCapAvatar
             avatarUrl={avatarUrl}
             showVideo={showVideo}
-            videoWidth={320}
+            videoWidth={640}
             onFrame={handleFrame}
           />
         </div>

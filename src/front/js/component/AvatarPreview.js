@@ -1,128 +1,102 @@
-// src/pages/AvatarPreviewPage.js
-import React, { useEffect, useState, Suspense } from "react";
-import { Canvas } from "@react-three/fiber";
-import { OrbitControls, useGLTF, Environment } from "@react-three/drei";
+// src/front/js/component/AvatarPreview.js
+// Restored: 3D Canvas rendering avatar + outfit, dark-themed, with error boundary
 
-// ─── Consistent model path ───
-const DEFAULT_MODEL = "/static/models/Y_Bot.glb";
+import React, { Suspense, useState } from 'react';
+import { Canvas } from '@react-three/fiber';
+import { OrbitControls, useGLTF, Stage } from '@react-three/drei';
 
-// Component that loads and applies skin color to meshes
-const ModelViewer = ({ url, skinColor }) => {
-  const { scene } = useGLTF(url);
+const BACKEND = process.env.REACT_APP_BACKEND_URL || '';
 
-  useEffect(() => {
-    scene.traverse((child) => {
-      if (child.isMesh && child.name.toLowerCase().includes("skin")) {
-        child.material.color.set(skinColor);
-      }
-    });
-  }, [scene, skinColor]);
-
-  return <primitive object={scene} scale={1.5} />;
+const AvatarModel = () => {
+  try {
+    const { scene } = useGLTF(`${BACKEND}/static/models/xbot_avatar.glb`);
+    return <primitive object={scene} scale={1.5} />;
+  } catch {
+    return null;
+  }
 };
 
-const AvatarPreviewPage = () => {
-  const [avatarUrl, setAvatarUrl] = useState(null);
-  const [riggedUrl, setRiggedUrl] = useState(null);
-  const [skinColor, setSkinColor] = useState("#c68642"); // Default brown tone
-  const [message, setMessage] = useState("");
-  const [usageInfo, setUsageInfo] = useState(null);
+const OutfitModel = ({ file }) => {
+  try {
+    const { scene } = useGLTF(`${BACKEND}/static/outfits/${file}`);
+    return <primitive object={scene} scale={1.5} position={[0, 0, 0]} />;
+  } catch {
+    return null;
+  }
+};
 
-  const backendUrl = process.env.REACT_APP_BACKEND_URL || "";
-  const user_id = localStorage.getItem("user_id");
-  const avatar_id = localStorage.getItem("avatar_id");
+export const AvatarPreview = ({ outfitFile }) => {
+  const [loadError, setLoadError] = useState(false);
 
-  useEffect(() => {
-    const raw = localStorage.getItem("avatar_url");
-    if (raw) setAvatarUrl(raw);
+  if (!outfitFile) return null;
 
-    const storedRig = localStorage.getItem("rigged_url");
-    if (storedRig) {
-      setRiggedUrl(storedRig);
-    } else if (avatar_id && user_id) {
-      rigAvatar(); // Auto-rig
-    }
-  }, [avatar_id, user_id]);
-
-  const rigAvatar = async () => {
-    setMessage("⚙️ Rigging avatar...");
-    try {
-      const res = await fetch(`${backendUrl}/rig-avatar`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ avatar_id, user_id }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        alert(data.error || "Rigging failed.");
-        setMessage("");
-        return;
-      }
-
-      setRiggedUrl(data.rig_url);
-      localStorage.setItem("rigged_url", data.rig_url);
-      setUsageInfo({ used: data.usage, limit: data.limit });
-      setMessage("✅ Rigging successful!");
-    } catch (err) {
-      console.error("Error during rigging", err);
-      setMessage("❌ Error while rigging.");
-    }
-  };
-
-  const renderCanvas = (url, label) => (
-    <div style={{ width: "48%" }}>
-      <h5>{label}</h5>
-      <Canvas style={{ height: "400px" }}>
-        <Suspense fallback={null}>
-          <ambientLight intensity={0.5} />
-          <Environment preset="sunset" />
-          <ModelViewer url={url} skinColor={skinColor} />
-          <OrbitControls />
-        </Suspense>
-      </Canvas>
-      <a href={url} download className="btn btn-sm btn-outline-info mt-2">
-        Download
-      </a>
-    </div>
-  );
+  if (loadError) {
+    return (
+      <div style={{
+        width: '100%',
+        height: '320px',
+        background: '#111118',
+        border: '1px solid #2a2a3e',
+        borderRadius: '12px',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#666',
+        fontSize: '13px',
+        gap: '8px',
+      }}>
+        <span style={{ fontSize: '32px' }}>👕</span>
+        <span>3D preview unavailable</span>
+        <span style={{ fontSize: '11px', color: '#555' }}>
+          Outfit file: <code style={{ color: '#a78bfa' }}>{outfitFile}</code>
+        </span>
+      </div>
+    );
+  }
 
   return (
-    <div className="container mt-4">
-      <h3>🧍 Avatar Preview</h3>
+    <div style={{
+      width: '100%',
+      height: '320px',
+      background: '#0d0d14',
+      border: '1px solid #2a2a3e',
+      borderRadius: '12px',
+      overflow: 'hidden',
+      position: 'relative',
+    }}>
+      <Canvas
+        camera={{ position: [0, 1.5, 3], fov: 50 }}
+        onError={() => setLoadError(true)}
+        style={{ height: '100%' }}
+      >
+        <Suspense fallback={null}>
+          <ambientLight intensity={0.9} />
+          <directionalLight position={[0, 5, 5]} intensity={0.6} />
+          <Stage environment="city" intensity={0.5}>
+            <AvatarModel />
+            <OutfitModel file={outfitFile} />
+          </Stage>
+          <OrbitControls enableZoom enablePan={false} />
+        </Suspense>
+      </Canvas>
 
-      {/* Skin tone picker */}
-      <div className="mb-3">
-        <label className="form-label">🎨 Select Skin Tone:</label>
-        <input
-          type="color"
-          value={skinColor}
-          onChange={(e) => setSkinColor(e.target.value)}
-          className="form-control form-control-color"
-        />
+      {/* Label overlay */}
+      <div style={{
+        position: 'absolute',
+        bottom: '8px',
+        left: '8px',
+        background: 'rgba(0,0,0,0.6)',
+        color: '#aaa',
+        fontSize: '10px',
+        padding: '3px 8px',
+        borderRadius: '6px',
+        backdropFilter: 'blur(4px)',
+      }}>
+        🎮 Drag to rotate · Scroll to zoom
       </div>
-
-      <div className="d-flex justify-content-between flex-wrap gap-3">
-        {avatarUrl && renderCanvas(avatarUrl, ".PLY (Raw Mesh)")}
-        {riggedUrl && renderCanvas(riggedUrl, ".GLB (Rigged Avatar)")}
-      </div>
-
-      {!riggedUrl && (
-        <button className="btn btn-warning mt-4" onClick={rigAvatar}>
-          🔁 Retry Rigging
-        </button>
-      )}
-
-      {usageInfo && (
-        <p className="mt-2 text-muted">
-          {usageInfo.used} of {usageInfo.limit} rigging sessions used
-        </p>
-      )}
-
-      {message && <p className="mt-3">{message}</p>}
     </div>
   );
 };
 
-export default AvatarPreviewPage;
+export default AvatarPreview;

@@ -1,8 +1,9 @@
 // src/front/js/pages/ClothingMatchPage.js
-// Reworked: dark theme, fixed env vars, functional without external AI API
+// Reworked: dark theme, fixed env vars, AvatarPreview restored, functional without external AI API
 
 import React, { useState, useContext, useRef } from 'react';
 import { Context } from '../store/appContext';
+import { AvatarPreview } from '../component/AvatarPreview';
 import '../../styles/Wardrobe.css';
 
 const BACKEND = process.env.REACT_APP_BACKEND_URL || '';
@@ -60,7 +61,6 @@ const ClothingMatchPage = () => {
     reader.onloadend = () => {
       setImagePreview(reader.result);
 
-      // Simple color analysis from image
       const img = new Image();
       img.src = reader.result;
       img.onload = () => {
@@ -78,7 +78,6 @@ const ClothingMatchPage = () => {
         }
         if (count > 0) { r = r / count; g = g / count; b = b / count; }
 
-        // Map dominant color to style keywords
         const keywords = [];
         if (r > 180 && g < 100 && b < 100) keywords.push('red', 'bold');
         else if (b > 180 && r < 100) keywords.push('blue', 'cool');
@@ -136,7 +135,7 @@ const ClothingMatchPage = () => {
       </div>
 
       <div className="df-grid-2">
-        {/* Left: Input */}
+        {/* ── Left: Style Input ── */}
         <div className="df-card">
           <div className="df-card__header">
             <h3 className="df-card__title">📸 Style Input</h3>
@@ -204,7 +203,7 @@ const ClothingMatchPage = () => {
           </div>
         </div>
 
-        {/* Right: Results */}
+        {/* ── Right: Results ── */}
         <div className="df-card">
           <div className="df-card__header">
             <h3 className="df-card__title">🎽 Matching Outfits</h3>
@@ -236,20 +235,31 @@ const ClothingMatchPage = () => {
                 ))}
               </div>
             )}
-
-            {selectedOutfit && (
-              <div className="df-actions">
-                <button className="df-btn df-btn--success" onClick={handleSave}>
-                  💾 Save to Profile
-                </button>
-                <button className="df-btn df-btn--ghost" onClick={() => setSelectedOutfit(null)}>
-                  Clear Selection
-                </button>
-              </div>
-            )}
           </div>
         </div>
       </div>
+
+      {/* ── 3D Avatar Preview (shows when outfit selected) ── */}
+      {selectedOutfit && (
+        <div className="df-card" style={{ marginTop: '16px' }}>
+          <div className="df-card__header">
+            <h3 className="df-card__title">👕 Preview: {selectedOutfit.name}</h3>
+            <span className="df-card__badge df-card__badge--purple">{selectedOutfit.file}</span>
+          </div>
+          <div className="df-card__body">
+            <AvatarPreview outfitFile={selectedOutfit.file} />
+
+            <div className="df-actions" style={{ marginTop: '12px' }}>
+              <button className="df-btn df-btn--success" onClick={handleSave}>
+                💾 Save to Profile
+              </button>
+              <button className="df-btn df-btn--ghost" onClick={() => setSelectedOutfit(null)}>
+                Clear Selection
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

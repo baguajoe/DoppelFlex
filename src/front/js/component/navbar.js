@@ -1,186 +1,249 @@
 // src/front/js/component/navbar.js
-import React, { useState, useContext, useEffect, useRef } from "react";
-import { Link, useLocation } from "react-router-dom";
-import { Context } from "../store/appContext";
-import "../../styles/navbar.css";
+// Restyled: Dark theme, DoppelFlex branding, streamlined nav, auth-aware login/logout
+
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 
 const Navbar = () => {
-  const [authStatus, setAuthStatus] = useState(false);
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { store, actions } = useContext(Context);
-  const location = useLocation();
-  const userMenuRef = useRef(null);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    const authUpdate = async () => {
-      setAuthStatus(await actions.authenticate());
-    };
-    authUpdate();
+    setIsLoggedIn(!!localStorage.getItem('token'));
   }, []);
 
-  // Close user menu on outside click
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (userMenuRef.current && !userMenuRef.current.contains(e.target)) {
-        setUserMenuOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user_id');
+    localStorage.removeItem('username');
+    setIsLoggedIn(false);
+    navigate('/login');
+  };
 
-  // Close mobile menu on route change
-  useEffect(() => {
-    setMobileMenuOpen(false);
-  }, [location]);
-
-  const isActive = (path) => location.pathname === path;
+  const navLinks = [
+    { to: '/upload', label: '📸 Upload' },
+    { to: '/motion', label: '🎥 Capture' },
+    { to: '/dance-sync', label: '💃 Dance' },
+    { to: '/stripe-pricing', label: '💳 Plans' },
+  ];
 
   return (
-    <nav className="df-navbar">
-      {/* Gradient line at top */}
-      <div className="df-navbar-accent-line" />
-
-      <div className="df-navbar-inner">
+    <nav style={{
+      background: '#0a0a12',
+      borderBottom: '1px solid #1a1a2e',
+      padding: '0 20px',
+      position: 'sticky',
+      top: 0,
+      zIndex: 1000,
+    }}>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        height: '56px',
+        maxWidth: '1400px',
+        margin: '0 auto',
+      }}>
         {/* Brand */}
-        <Link to="/" className="df-navbar-brand">
-          <div className="df-navbar-logo">
-            <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-              <rect x="2" y="2" width="24" height="24" rx="6" 
-                stroke="url(#logo-grad)" strokeWidth="2.5" fill="none" />
-              <circle cx="14" cy="11" r="4" fill="url(#logo-grad)" />
-              <path d="M8 22c0-3.3 2.7-6 6-6s6 2.7 6 6" 
-                stroke="url(#logo-grad)" strokeWidth="2.5" strokeLinecap="round" fill="none" />
-              <defs>
-                <linearGradient id="logo-grad" x1="0" y1="0" x2="28" y2="28">
-                  <stop stopColor="#7c6aef" />
-                  <stop offset="1" stopColor="#00e5c3" />
-                </linearGradient>
-              </defs>
-            </svg>
-          </div>
-          <span className="df-navbar-brand-text">
-            Doppel<span className="df-navbar-brand-highlight">Flex</span>
+        <Link to="/" style={{
+          textDecoration: 'none',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+        }}>
+          <span style={{ fontSize: '20px' }}>🤖</span>
+          <span style={{
+            fontSize: '18px',
+            fontWeight: 800,
+            background: 'linear-gradient(135deg, #a78bfa, #6366f1)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+          }}>
+            DoppelFlex
           </span>
         </Link>
 
-        {/* Primary Nav Links */}
-        <div className={`df-navbar-links ${mobileMenuOpen ? "open" : ""}`}>
-          <Link 
-            to="/upload" 
-            className={`df-navbar-link ${isActive("/upload") ? "active" : ""}`}
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-              <path d="M8 1a.5.5 0 0 1 .5.5v5h5a.5.5 0 0 1 0 1h-5v5a.5.5 0 0 1-1 0v-5h-5a.5.5 0 0 1 0-1h5v-5A.5.5 0 0 1 8 1z"/>
-            </svg>
-            Create Avatar
-          </Link>
-          <Link 
-            to="/motion" 
-            className={`df-navbar-link ${isActive("/motion") ? "active" : ""}`}
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-              <path d="M11.5 6.027a.5.5 0 1 1-1 0 .5.5 0 0 1 1 0zm-1.5 1.5a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1zm2.5-.5a.5.5 0 1 1-1 0 .5.5 0 0 1 1 0zm-1.5 1.5a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1zm-6.5-3h1v1h-1v-1zm2 0h1v1h-1v-1zm2 0h1v1h-1v-1zM4.5 3a.5.5 0 0 0-.5.5v9a.5.5 0 0 0 .5.5h7a.5.5 0 0 0 .5-.5v-9a.5.5 0 0 0-.5-.5h-7zM2 3.5A1.5 1.5 0 0 1 3.5 2h9A1.5 1.5 0 0 1 14 3.5v9a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 12.5v-9z"/>
-            </svg>
-            Motion Capture
-          </Link>
-          <Link 
-            to="/dance-sync" 
-            className={`df-navbar-link ${isActive("/dance-sync") ? "active" : ""}`}
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-              <path d="M6 13c0 1.105-1.12 2-2.5 2S1 14.105 1 13c0-1.104 1.12-2 2.5-2s2.5.896 2.5 2zm9-2c0 1.105-1.12 2-2.5 2s-2.5-.895-2.5-2 1.12-2 2.5-2 2.5.895 2.5 2z"/>
-              <path fillRule="evenodd" d="M14 11V2h-1v9h1zM6 3v10H5V3h1z"/>
-              <path d="M5 2.905a1 1 0 0 1 .9-.995l8-.8a1 1 0 0 1 1.1.995V3L5 4V2.905z"/>
-            </svg>
-            Dance Sync
-          </Link>
-          <Link 
-            to="/stripe-pricing" 
-            className={`df-navbar-link ${isActive("/stripe-pricing") ? "active" : ""}`}
-          >
-            Pricing
-          </Link>
-        </div>
+        {/* Desktop Nav */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '4px',
+        }}
+          className="df-nav-desktop"
+        >
+          {navLinks.map((link) => (
+            <Link
+              key={link.to}
+              to={link.to}
+              style={{
+                color: '#aaa',
+                textDecoration: 'none',
+                fontSize: '13px',
+                padding: '6px 12px',
+                borderRadius: '6px',
+                transition: 'background 0.15s, color 0.15s',
+              }}
+              onMouseEnter={(e) => { e.target.style.background = '#1a1a2e'; e.target.style.color = '#e0e0e0'; }}
+              onMouseLeave={(e) => { e.target.style.background = 'transparent'; e.target.style.color = '#aaa'; }}
+            >
+              {link.label}
+            </Link>
+          ))}
 
-        {/* Right Side */}
-        <div className="df-navbar-right">
-          {authStatus ? (
-            <div className="df-navbar-user" ref={userMenuRef}>
-              <button 
-                className="df-navbar-avatar-btn"
-                onClick={() => setUserMenuOpen(!userMenuOpen)}
+          <div style={{ width: '1px', height: '24px', background: '#2a2a3e', margin: '0 8px' }} />
+
+          {isLoggedIn ? (
+            <>
+              <Link
+                to="/profile"
+                style={{
+                  color: '#aaa',
+                  textDecoration: 'none',
+                  fontSize: '13px',
+                  padding: '6px 12px',
+                  borderRadius: '6px',
+                }}
+                onMouseEnter={(e) => { e.target.style.background = '#1a1a2e'; e.target.style.color = '#e0e0e0'; }}
+                onMouseLeave={(e) => { e.target.style.background = 'transparent'; e.target.style.color = '#aaa'; }}
               >
-                <div className="df-navbar-avatar">
-                  <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor">
-                    <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4zm-1-.004c-.001-.246-.154-.986-.832-1.664C11.516 10.68 10.289 10 8 10c-2.29 0-3.516.68-4.168 1.332-.678.678-.83 1.418-.832 1.664h10z"/>
-                  </svg>
-                </div>
-                <svg className={`df-navbar-chevron ${userMenuOpen ? "open" : ""}`} 
-                  width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
-                  <path d="M2.5 4.5l3.5 3.5 3.5-3.5" stroke="currentColor" 
-                    strokeWidth="1.5" strokeLinecap="round" fill="none"/>
-                </svg>
-              </button>
-
-              {/* User Dropdown */}
-              {userMenuOpen && (
-                <div className="df-navbar-dropdown">
-                  <Link to="/profile" className="df-navbar-dropdown-item">
-                    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-                      <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4z"/>
-                    </svg>
-                    Profile
-                  </Link>
-                  <Link to="/motion-sessions" className="df-navbar-dropdown-item">
-                    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-                      <path d="M1 2.5A1.5 1.5 0 0 1 2.5 1h3A1.5 1.5 0 0 1 7 2.5v3A1.5 1.5 0 0 1 5.5 7h-3A1.5 1.5 0 0 1 1 5.5v-3zm8 0A1.5 1.5 0 0 1 10.5 1h3A1.5 1.5 0 0 1 15 2.5v3A1.5 1.5 0 0 1 13.5 7h-3A1.5 1.5 0 0 1 9 5.5v-3zm-8 8A1.5 1.5 0 0 1 2.5 9h3A1.5 1.5 0 0 1 7 10.5v3A1.5 1.5 0 0 1 5.5 15h-3A1.5 1.5 0 0 1 1 13.5v-3zm8 0A1.5 1.5 0 0 1 10.5 9h3a1.5 1.5 0 0 1 1.5 1.5v3a1.5 1.5 0 0 1-1.5 1.5h-3A1.5 1.5 0 0 1 9 13.5v-3z"/>
-                    </svg>
-                    My Sessions
-                  </Link>
-                  <Link to="/account-settings" className="df-navbar-dropdown-item">
-                    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-                      <path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492zM5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0z"/>
-                      <path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 0 1-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 0 1-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 0 1 .52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 0 1 1.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 0 1 1.255-.52l.292.16c1.64.893 3.434-.902 2.54-2.541l-.159-.292a.873.873 0 0 1 .52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 0 1-.52-1.255l.16-.292c.893-1.64-.902-3.433-2.541-2.54l-.292.159a.873.873 0 0 1-1.255-.52l-.094-.319z"/>
-                    </svg>
-                    Settings
-                  </Link>
-                  <div className="df-navbar-dropdown-divider" />
-                  <button className="df-navbar-dropdown-item df-navbar-dropdown-logout"
-                    onClick={() => actions.logout()}>
-                    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-                      <path fillRule="evenodd" d="M10 12.5a.5.5 0 0 1-.5.5h-8a.5.5 0 0 1-.5-.5v-9a.5.5 0 0 1 .5-.5h8a.5.5 0 0 1 .5.5v2a.5.5 0 0 0 1 0v-2A1.5 1.5 0 0 0 9.5 2h-8A1.5 1.5 0 0 0 0 3.5v9A1.5 1.5 0 0 0 1.5 14h8a1.5 1.5 0 0 0 1.5-1.5v-2a.5.5 0 0 0-1 0v2z"/>
-                      <path fillRule="evenodd" d="M15.854 8.354a.5.5 0 0 0 0-.708l-3-3a.5.5 0 0 0-.708.708L14.293 7.5H5.5a.5.5 0 0 0 0 1h8.793l-2.147 2.146a.5.5 0 0 0 .708.708l3-3z"/>
-                    </svg>
-                    Log Out
-                  </button>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="df-navbar-auth">
-              <Link to="/login" className="df-btn df-btn-ghost df-btn-sm">
-                Log In
+                👤 Profile
               </Link>
-              <Link to="/signup" className="df-btn df-btn-primary df-btn-sm">
+              <button
+                onClick={handleLogout}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid #2a2a3e',
+                  color: '#aaa',
+                  fontSize: '12px',
+                  padding: '5px 12px',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  transition: 'border-color 0.15s, color 0.15s',
+                }}
+                onMouseEnter={(e) => { e.target.style.borderColor = '#ef4444'; e.target.style.color = '#ef4444'; }}
+                onMouseLeave={(e) => { e.target.style.borderColor = '#2a2a3e'; e.target.style.color = '#aaa'; }}
+              >
+                Logout
+              </button>
+            </>
+          ) : (
+            <>
+              <Link
+                to="/login"
+                style={{
+                  color: '#aaa',
+                  textDecoration: 'none',
+                  fontSize: '13px',
+                  padding: '6px 12px',
+                  borderRadius: '6px',
+                }}
+                onMouseEnter={(e) => { e.target.style.background = '#1a1a2e'; e.target.style.color = '#e0e0e0'; }}
+                onMouseLeave={(e) => { e.target.style.background = 'transparent'; e.target.style.color = '#aaa'; }}
+              >
+                Login
+              </Link>
+              <Link
+                to="/signup"
+                style={{
+                  background: 'linear-gradient(135deg, #6366f1, #a78bfa)',
+                  color: '#fff',
+                  textDecoration: 'none',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  padding: '6px 16px',
+                  borderRadius: '6px',
+                }}
+              >
                 Sign Up
               </Link>
-            </div>
+            </>
           )}
-
-          {/* Mobile hamburger */}
-          <button 
-            className="df-navbar-hamburger"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            aria-label="Toggle menu"
-          >
-            <span className={`df-hamburger-bar ${mobileMenuOpen ? "open" : ""}`} />
-            <span className={`df-hamburger-bar ${mobileMenuOpen ? "open" : ""}`} />
-            <span className={`df-hamburger-bar ${mobileMenuOpen ? "open" : ""}`} />
-          </button>
         </div>
+
+        {/* Mobile Toggle */}
+        <button
+          onClick={() => setMobileOpen(!mobileOpen)}
+          className="df-nav-mobile-toggle"
+          style={{
+            display: 'none',
+            background: 'transparent',
+            border: '1px solid #2a2a3e',
+            color: '#aaa',
+            fontSize: '18px',
+            padding: '4px 10px',
+            borderRadius: '6px',
+            cursor: 'pointer',
+          }}
+        >
+          {mobileOpen ? '✕' : '☰'}
+        </button>
       </div>
+
+      {/* Mobile Dropdown */}
+      {mobileOpen && (
+        <div
+          className="df-nav-mobile-menu"
+          style={{
+            borderTop: '1px solid #1a1a2e',
+            padding: '12px 0',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '4px',
+          }}
+        >
+          {navLinks.map((link) => (
+            <Link
+              key={link.to}
+              to={link.to}
+              onClick={() => setMobileOpen(false)}
+              style={{
+                color: '#aaa',
+                textDecoration: 'none',
+                fontSize: '14px',
+                padding: '10px 16px',
+                borderRadius: '6px',
+              }}
+            >
+              {link.label}
+            </Link>
+          ))}
+          {isLoggedIn ? (
+            <>
+              <Link to="/profile" onClick={() => setMobileOpen(false)}
+                style={{ color: '#aaa', textDecoration: 'none', padding: '10px 16px', fontSize: '14px' }}>
+                👤 Profile
+              </Link>
+              <button onClick={() => { handleLogout(); setMobileOpen(false); }}
+                style={{ background: 'transparent', border: 'none', color: '#ef4444', textAlign: 'left', padding: '10px 16px', fontSize: '14px', cursor: 'pointer' }}>
+                Logout
+              </button>
+            </>
+          ) : (
+            <>
+              <Link to="/login" onClick={() => setMobileOpen(false)}
+                style={{ color: '#aaa', textDecoration: 'none', padding: '10px 16px', fontSize: '14px' }}>
+                Login
+              </Link>
+              <Link to="/signup" onClick={() => setMobileOpen(false)}
+                style={{ color: '#a78bfa', textDecoration: 'none', padding: '10px 16px', fontSize: '14px', fontWeight: 700 }}>
+                Sign Up
+              </Link>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Responsive CSS injected inline */}
+      <style>{`
+        @media (max-width: 768px) {
+          .df-nav-desktop { display: none !important; }
+          .df-nav-mobile-toggle { display: block !important; }
+        }
+        @media (min-width: 769px) {
+          .df-nav-mobile-menu { display: none !important; }
+        }
+      `}</style>
     </nav>
   );
 };

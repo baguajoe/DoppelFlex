@@ -1,6 +1,7 @@
 // src/front/js/component/MotionCaptureWithRecording.js
 // Fixed: MediaPipe Pose & Camera loaded from CDN (avoids Babel ES6 class crash)
 // Fixed: All fetch URLs use REACT_APP_BACKEND_URL
+// Updated: fullWidth prop for responsive sizing, 1280x720 capture, dark theme controls
 
 import React, { useEffect, useRef, useState } from 'react';
 
@@ -27,8 +28,9 @@ const loadScript = (src) =>
  *   userId      — (optional) user ID for session saving
  *   socket      — (optional) WebSocket for real-time streaming
  *   onPoseFrame — (optional) callback receiving each pose frame
+ *   fullWidth   — (optional) if true, video fills parent container
  */
-const MotionCaptureWithRecording = ({ userId, socket, onPoseFrame }) => {
+const MotionCaptureWithRecording = ({ userId, socket, onPoseFrame, fullWidth = false }) => {
   const videoRef = useRef(null);
   const avatarRef = useRef(null);
   const mediaRecorderRef = useRef(null);
@@ -90,8 +92,8 @@ const MotionCaptureWithRecording = ({ userId, socket, onPoseFrame }) => {
           onFrame: async () => {
             await pose.send({ image: videoRef.current });
           },
-          width: 640,
-          height: 480,
+          width: 1280,
+          height: 720,
         });
 
         camera.start();
@@ -207,6 +209,24 @@ const MotionCaptureWithRecording = ({ userId, socket, onPoseFrame }) => {
     }
   };
 
+  // ── Responsive video sizing ──
+  const videoStyle = fullWidth
+    ? {
+        width: '100%',
+        height: '100%',
+        objectFit: 'cover',
+        display: 'block',
+        minHeight: '440px',
+        borderRadius: '8px',
+        background: '#000',
+      }
+    : {
+        width: '640px',
+        height: '480px',
+        borderRadius: '8px',
+        background: '#000',
+      };
+
   return (
     <div>
       {status && <p style={{ color: '#888', fontSize: '13px' }}>{status}</p>}
@@ -216,37 +236,59 @@ const MotionCaptureWithRecording = ({ userId, socket, onPoseFrame }) => {
         autoPlay
         playsInline
         muted
-        width="640"
-        height="480"
-        style={{ borderRadius: '8px', background: '#000' }}
+        style={videoStyle}
       />
 
       <div ref={avatarRef} style={{ display: 'none' }} />
 
-      <div className="mt-3 d-flex gap-2 flex-wrap">
+      <div style={{
+        display: 'flex',
+        gap: '8px',
+        flexWrap: 'wrap',
+        marginTop: '12px',
+        padding: '8px 0',
+      }}>
         <button
-          className="btn btn-primary"
+          className={`df-btn ${recordingVideo ? 'df-btn--danger' : 'df-btn--primary'}`}
           onClick={recordingVideo ? stopVideoRecording : startVideoRecording}
         >
           {recordingVideo ? '⏹ Stop Recording' : '⏺ Start Video Recording'}
         </button>
 
-        <button className="btn btn-success" onClick={handleExport}>
+        <button className="df-btn df-btn--ghost" onClick={handleExport}>
           📥 Download Pose Data
         </button>
 
-        <button className="btn btn-warning" onClick={handleUpload}>
+        <button className="df-btn df-btn--ghost" onClick={handleUpload}>
           ⬆️ Upload to Backend
         </button>
 
         {convertedUrl && (
-          <a className="btn btn-outline-success" href={convertedUrl} target="_blank" rel="noreferrer">
+          <a
+            className="df-btn df-btn--ghost"
+            href={convertedUrl}
+            target="_blank"
+            rel="noreferrer"
+            style={{ textDecoration: 'none' }}
+          >
             🎬 View MP4
           </a>
         )}
       </div>
 
-      {saveStatus && <p className="mt-2">{saveStatus}</p>}
+      {saveStatus && (
+        <p style={{
+          marginTop: '8px',
+          fontSize: '13px',
+          color: saveStatus.includes('🎉') || saveStatus.includes('complete')
+            ? '#4ade80'
+            : saveStatus.includes('failed') || saveStatus.includes('error')
+            ? '#f87171'
+            : '#ccc',
+        }}>
+          {saveStatus}
+        </p>
+      )}
     </div>
   );
 };
