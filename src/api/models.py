@@ -263,3 +263,5 @@ class AvatarPreset(db.Model):
     
     def __repr__(self):
         return f"<AvatarPreset {self.id} - User {self.user_id}>"
+    
+
