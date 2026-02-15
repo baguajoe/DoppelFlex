@@ -17,6 +17,7 @@ const sidebarSections = [
       { to: "/rig", label: "Rig Avatar" },
       { to: "/body-customizer", label: "Body Type" },
       { to: "/illustration-to-3d", label: "Drawing to 3D" },
+      { to: "/illustration-puppet", label: "Drawing to Puppet" },
       { to: "/export-avatar", label: "Export" },
     ],
   },

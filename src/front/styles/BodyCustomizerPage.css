@@ -156,6 +156,11 @@
   gap: 8px;
 }
 
+.bcp-preview-panel--3d {
+  width: 100%;
+  max-width: 500px;
+}
+
 .bcp-preview-label {
   color: #555;
   font-size: 11px;
@@ -171,21 +176,41 @@
   border-radius: 12px;
 }
 
-/* 3D preview placeholder */
-.avatar-3d-preview {
-  width: 280px;
+/* ─── 3D Preview (real Three.js) ─── */
+.avatar-3d-preview-live {
+  width: 100%;
   height: 480px;
   background: #0a0a14;
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  position: relative;
+  overflow: hidden;
 }
 
-.avatar-3d-placeholder {
-  text-align: center;
+.avatar-3d-preview-live canvas {
+  border-radius: 12px;
+}
+
+/* Overlay states (loading / empty / error) */
+.avatar-3d-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   color: #444;
+  text-align: center;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.avatar-3d-overlay p {
+  margin: 4px 0;
+  font-size: 13px;
 }
 
 .avatar-3d-icon {
@@ -194,16 +219,159 @@
   opacity: 0.5;
 }
 
-.avatar-3d-placeholder p {
-  margin: 0;
-  font-size: 13px;
-}
-
 .avatar-3d-hint {
   font-size: 11px !important;
   color: #333 !important;
   margin-top: 8px !important;
   line-height: 1.4;
+}
+
+/* Loading spinner */
+.avatar-3d-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(99, 102, 241, 0.15);
+  border-top-color: #6366f1;
+  border-radius: 50%;
+  animation: spin3d 0.8s linear infinite;
+  margin-bottom: 10px;
+}
+
+@keyframes spin3d {
+  to { transform: rotate(360deg); }
+}
+
+/* ─── Model loader panel ─── */
+.bcp-model-loader {
+  background: #12121e;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 14px;
+  margin-top: 12px;
+}
+
+.bcp-model-loader-title {
+  color: #a0a0c0;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin: 0 0 10px 0;
+}
+
+.bcp-upload-model-btn {
+  width: 100%;
+  padding: 10px;
+  background: rgba(99, 102, 241, 0.1);
+  border: 1px dashed rgba(99, 102, 241, 0.3);
+  border-radius: 8px;
+  color: #a78bfa;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.bcp-upload-model-btn:hover {
+  background: rgba(99, 102, 241, 0.18);
+  border-color: rgba(99, 102, 241, 0.5);
+}
+
+/* Saved avatars */
+.bcp-saved-avatars {
+  margin-top: 10px;
+}
+
+.bcp-saved-avatars-label {
+  display: block;
+  color: #666;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+.bcp-avatar-pick {
+  display: inline-block;
+  padding: 4px 10px;
+  margin: 2px 4px 2px 0;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  color: #888;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.bcp-avatar-pick:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #bbb;
+}
+
+.bcp-avatar-pick--active {
+  background: rgba(99, 102, 241, 0.15);
+  border-color: rgba(99, 102, 241, 0.4);
+  color: #a78bfa;
+}
+
+.bcp-model-hint {
+  color: #444;
+  font-size: 11px;
+  margin: 10px 0 0;
+  line-height: 1.5;
+}
+
+.bcp-clear-model-btn {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 6px;
+  background: rgba(248, 113, 113, 0.08);
+  border: 1px solid rgba(248, 113, 113, 0.15);
+  border-radius: 6px;
+  color: #f87171;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.bcp-clear-model-btn:hover {
+  background: rgba(248, 113, 113, 0.15);
+}
+
+/* ─── Bone debug ─── */
+.bcp-bone-debug {
+  margin-top: 12px;
+  background: #12121e;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 10px 14px;
+}
+
+.bcp-bone-debug summary {
+  color: #666;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.bcp-bone-debug summary:hover {
+  color: #888;
+}
+
+.bcp-bone-debug-pre {
+  margin-top: 8px;
+  padding: 10px;
+  background: #0a0a14;
+  border-radius: 8px;
+  color: #6366f1;
+  font-size: 10px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  max-height: 300px;
+  overflow-y: auto;
+  line-height: 1.5;
 }
 
 /* Active preset badge */
@@ -254,9 +422,12 @@
     align-items: center;
   }
 
-  .puppet-preview-canvas,
-  .avatar-3d-preview {
+  .puppet-preview-canvas {
     width: 240px;
+    height: 400px;
+  }
+
+  .avatar-3d-preview-live {
     height: 400px;
   }
 }

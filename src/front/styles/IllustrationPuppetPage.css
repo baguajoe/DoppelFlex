@@ -1,0 +1,185 @@
+/* src/front/styles/IllustrationPuppetPage.css */
+
+.illus-puppet-page {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.ipp-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.ipp-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #e0e0f0;
+  margin: 0 0 4px 0;
+}
+
+.ipp-subtitle {
+  color: #666;
+  font-size: 13px;
+  margin: 0;
+}
+
+.ipp-export-btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.05);
+  color: #aaa;
+  transition: all 0.15s ease;
+}
+
+.ipp-export-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ddd;
+}
+
+/* Steps */
+.ipp-steps {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.ipp-step {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #444;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.ipp-step--done { color: #10b981; }
+.ipp-step--active { color: #a78bfa; }
+
+.ipp-step-num {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.ipp-step--done .ipp-step-num {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+
+.ipp-step--active .ipp-step-num {
+  background: rgba(99, 102, 241, 0.2);
+  color: #a78bfa;
+}
+
+.ipp-step-arrow {
+  color: #333;
+  font-size: 14px;
+}
+
+/* Layout */
+.ipp-layout {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.ipp-segmenter-panel {
+  flex-shrink: 0;
+  width: 380px;
+}
+
+.ipp-edit-panel {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.ipp-sliders {
+  flex-shrink: 0;
+  width: 340px;
+}
+
+.ipp-preview {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.illus-puppet-canvas {
+  background: #0a0a14;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  max-width: 100%;
+  height: auto;
+}
+
+.ipp-preview-label {
+  color: #666;
+  font-size: 12px;
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 4px 12px;
+  border-radius: 12px;
+}
+
+/* Waiting state */
+.ipp-waiting {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 60px 20px;
+  color: #444;
+}
+
+.ipp-waiting-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+  opacity: 0.5;
+}
+
+.ipp-waiting h5 {
+  color: #666;
+  font-size: 15px;
+  margin: 0 0 8px 0;
+}
+
+.ipp-waiting p {
+  color: #444;
+  font-size: 12px;
+  max-width: 300px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+@media (max-width: 1024px) {
+  .ipp-layout { flex-direction: column; }
+  .ipp-segmenter-panel { width: 100%; }
+  .ipp-edit-panel { flex-direction: column; width: 100%; }
+  .ipp-sliders { width: 100%; }
+}

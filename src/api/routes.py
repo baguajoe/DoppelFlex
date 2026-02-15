@@ -331,51 +331,169 @@ def create_avatar():
         return jsonify({"error": str(e)}), 500
 
 
+# ─── REPLACE your generate_avatar function in routes.py with this ───
+# Delete the old @api.route("/generate-avatar") function entirely
+# and paste this in its place:
+
+# ─── REPLACE your generate_avatar function in routes.py with this ───
+# Handles: single front photo OR multi-angle (front + left + right profiles)
+# Extracts skin color automatically, allows user override
+# Returns full head GLB with vertex colors
+
 @api.route("/generate-avatar", methods=["POST"])
 def generate_avatar():
-    """Generate face mesh from selfie (Step 2 of UploadPage pipeline)."""
+    """Generate full 3D head mesh from selfie(s).
+    Supports single front photo or multi-angle (front + side profiles).
+    Extracts skin color and applies to mesh.
+    """
     try:
-        import pyvista as pv
         import scipy.spatial as sp
     except ImportError as e:
         return jsonify({"error": f"Server missing required library: {str(e)}"}), 500
 
-    image = request.files.get("image")
-    if not image:
-        return jsonify({"error": "No image uploaded"}), 400
+    # Get images — front is required, sides are optional
+    front_image = request.files.get("image") or request.files.get("front")
+    left_image = request.files.get("left")
+    right_image = request.files.get("right")
 
-    filename = secure_filename(image.filename)
-    filepath = os.path.join(UPLOAD_FOLDER, filename)
-    image.save(filepath)
+    if not front_image:
+        return jsonify({"error": "No front photo uploaded"}), 400
+
+    quality = request.form.get("quality", "balanced")
+    custom_skin_color = request.form.get("skin_color")  # Optional hex override
+
+    # Save front photo
+    front_filename = secure_filename(front_image.filename)
+    front_path = os.path.join(UPLOAD_FOLDER, f"front_{front_filename}")
+    front_image.save(front_path)
+
+    # Save side photos if provided
+    left_path = None
+    right_path = None
+
+    if left_image:
+        left_filename = secure_filename(left_image.filename)
+        left_path = os.path.join(UPLOAD_FOLDER, f"left_{left_filename}")
+        left_image.save(left_path)
+
+    if right_image:
+        right_filename = secure_filename(right_image.filename)
+        right_path = os.path.join(UPLOAD_FOLDER, f"right_{right_filename}")
+        right_image.save(right_path)
 
     try:
+        # ─── Step 1: Front face landmarks ───
         mp_face_mesh = mp.solutions.face_mesh
-        face_mesh = mp_face_mesh.FaceMesh(static_image_mode=True, max_num_faces=1)
+        face_mesh = mp_face_mesh.FaceMesh(
+            static_image_mode=True,
+            max_num_faces=1,
+            refine_landmarks=True,
+            min_detection_confidence=0.5,
+        )
 
-        img = cv2.imread(filepath)
+        img = cv2.imread(front_path)
         img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         results = face_mesh.process(img_rgb)
 
         if not results.multi_face_landmarks:
-            return jsonify({"error": "No face landmarks detected"}), 400
+            return jsonify({"error": "No face landmarks detected in front photo"}), 400
 
         landmarks = results.multi_face_landmarks[0]
-        points = np.array([(lm.x, lm.y, lm.z) for lm in landmarks.landmark])
 
-        cloud = pv.PolyData(points)
-        mesh = cloud.delaunay_2d()
+        # ─── Step 2: Extract skin color ───
+        from api.skin_color_extractor import extract_skin_color, apply_skin_color_to_mesh
 
+        if custom_skin_color:
+            # User provided a color override
+            hex_color = custom_skin_color.lstrip("#")
+            r, g, b = int(hex_color[:2], 16), int(hex_color[2:4], 16), int(hex_color[4:6], 16)
+            skin_data = {
+                "hex": f"#{hex_color}",
+                "rgb": [r, g, b],
+                "rgb_float": [r / 255, g / 255, b / 255],
+                "confidence": 1.0,
+                "source": "user_override",
+                "palette": [],
+            }
+        else:
+            skin_data = extract_skin_color(front_path, landmarks, img.shape)
+            skin_data["source"] = "auto_detected"
+
+        # ─── Step 3: Process side profiles ───
+        profile_params = None
+
+        if left_path or right_path:
+            from api.multi_angle_head import (
+                extract_profile_landmarks,
+                merge_multi_angle_data,
+            )
+
+            left_profile = None
+            right_profile = None
+
+            if left_path:
+                print("[generate-avatar] Processing left profile...")
+                left_profile = extract_profile_landmarks(left_path)
+
+            if right_path:
+                print("[generate-avatar] Processing right profile...")
+                right_profile = extract_profile_landmarks(right_path)
+
+            profile_params = merge_multi_angle_data(
+                landmarks, img.shape, left_profile, right_profile
+            )
+            print(f"[generate-avatar] Profile data merged: {profile_params}")
+
+        # ─── Step 4: Generate full head mesh ───
+        quality_map = {
+            "fast": {"resolution": 20, "use_depth": False, "depth_strength": 0},
+            "balanced": {"resolution": 32, "use_depth": True, "depth_strength": 0.025},
+            "high": {"resolution": 48, "use_depth": True, "depth_strength": 0.035},
+        }
+        settings = quality_map.get(quality, quality_map["balanced"])
+
+        from api.head_mesh_generator import generate_full_head
+
+        mesh = generate_full_head(
+            image_path=front_path,
+            face_landmarks=landmarks,
+            image_shape=img.shape,
+            resolution=settings["resolution"],
+            use_depth=settings["use_depth"],
+            depth_strength=settings["depth_strength"],
+        )
+
+        # ─── Step 5: Apply profile deformation if available ───
+        if profile_params and profile_params.get("has_side_data"):
+            from api.multi_angle_head import apply_profile_deformation
+            mesh.vertices = apply_profile_deformation(mesh.vertices, profile_params)
+            mesh.fix_normals()
+
+        # ─── Step 6: Apply skin color ───
+        mesh = apply_skin_color_to_mesh(mesh, skin_data["rgb_float"])
+
+        # ─── Step 7: Export ───
         glb_filename = f"face_mesh_{uuid4().hex[:8]}.glb"
         glb_path = os.path.join(EXPORT_FOLDER, glb_filename)
+        mesh.export(glb_path, file_type="glb")
 
-        tri_mesh = trimesh.Trimesh(
-            vertices=np.array(mesh.points),
-            faces=np.array(mesh.faces).reshape(-1, 4)[:, 1:]
-        )
-        tri_mesh.export(glb_path, file_type="glb")
+        # Clean up temp files
+        try:
+            if left_path and os.path.exists(left_path):
+                os.remove(left_path)
+            if right_path and os.path.exists(right_path):
+                os.remove(right_path)
+        except:
+            pass
 
         return jsonify({
-            "avatar_model_url": f"/static/exports/{glb_filename}"
+            "avatar_model_url": f"/static/exports/{glb_filename}",
+            "quality": quality,
+            "vertices": len(mesh.vertices),
+            "faces": len(mesh.faces),
+            "skin_color": skin_data,
+            "multi_angle": bool(left_path or right_path),
+            "profile_enhanced": bool(profile_params and profile_params.get("has_side_data")),
         }), 200
 
     except Exception as e:
@@ -384,6 +502,44 @@ def generate_avatar():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
+
+@api.route("/api/extract-skin-color", methods=["POST"])
+def extract_skin_color_endpoint():
+    """Standalone endpoint to extract skin color from a photo.
+    Useful for the 2D puppet color picker.
+    """
+    image = request.files.get("image")
+    if not image:
+        return jsonify({"error": "No image provided"}), 400
+
+    filename = secure_filename(image.filename)
+    filepath = os.path.join(UPLOAD_FOLDER, f"skin_{filename}")
+    image.save(filepath)
+
+    try:
+        mp_face_mesh = mp.solutions.face_mesh
+        face_mesh = mp_face_mesh.FaceMesh(
+            static_image_mode=True,
+            max_num_faces=1,
+            min_detection_confidence=0.5,
+        )
+
+        img = cv2.imread(filepath)
+        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        results = face_mesh.process(img_rgb)
+
+        if not results.multi_face_landmarks:
+            return jsonify({"error": "No face detected"}), 400
+
+        from api.skin_color_extractor import extract_skin_color
+        skin_data = extract_skin_color(filepath, results.multi_face_landmarks[0], img.shape)
+
+        os.remove(filepath)
+
+        return jsonify({"success": True, **skin_data}), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @api.route("/generate-full-avatar", methods=["POST"])
 def generate_full_avatar():

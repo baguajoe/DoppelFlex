@@ -19,7 +19,7 @@ const AvatarViewer = ({ modelUrl }) => (
       shadows
       camera={{ position: [0, 1.5, 3], fov: 45 }}
     >
-      <Suspense fallback={<span>Loading 3D avatar...</span>}>
+      <Suspense fallback={null}>
         <ambientLight intensity={0.5} />
         <directionalLight
           position={[5, 5, 5]}

@@ -1,5 +1,4 @@
 // src/front/js/layout.js
-// Fixed: DoppelFlex footer, dark background, removed hardcoded userId, proper component imports
 
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
@@ -36,6 +35,7 @@ import FullBodyCapturePage from './pages/FullBodyCapturePage';
 import IllustrationTo3DPage from './pages/IllustrationTo3DPage';
 import Live2DAvatarPage from './pages/Live2DAvatarPage';
 import BodyCustomizerPage from './pages/BodyCustomizerPage';
+import IllustrationPuppetPage from './pages/IllustrationPuppetPage';
 
 
 const Layout = () => {
@@ -55,6 +55,7 @@ const Layout = () => {
               <Route path="/avatar-view" element={<AvatarViewPage />} />
               <Route path="/export-avatar" element={<AvatarExportPage />} />
               <Route path="/illustration-to-3d" element={<IllustrationTo3DPage />} />
+              <Route path="/illustration-puppet" element={<IllustrationPuppetPage />} />
               <Route path="/body-customizer" element={<BodyCustomizerPage />} />
 
               {/* Motion Capture */}

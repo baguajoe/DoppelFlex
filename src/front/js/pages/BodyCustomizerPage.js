@@ -1,20 +1,22 @@
 // src/front/js/pages/BodyCustomizerPage.js
 // Full body customization page with presets + sliders
-// Live preview on both 2D puppet and 3D avatar
+// Live preview on both 2D puppet and 3D avatar with real Three.js viewer
 // Save body type to profile, use in mocap sessions
 
 import React, { useState, useRef, useEffect, useCallback, useContext } from "react";
 import { Context } from "../store/appContext";
 import BodyCustomizer from "../component/BodyCustomizer";
+import Avatar3DPreview from "../component/Avatar3DPreview";
 import {
   DEFAULT_PROPORTIONS,
   BODY_PRESETS,
   proportionsToPuppetStyle,
+  proportionsToBoneScales,
   applyProportionsToAvatar,
 } from "../utils/bodyPresets";
 import "../../styles/BodyCustomizerPage.css";
 
-// Simple 2D puppet preview canvas that responds to proportion changes
+// ─── Simple 2D puppet preview canvas ───
 const PuppetPreview = ({ proportions }) => {
   const canvasRef = useRef(null);
 
@@ -30,19 +32,16 @@ const PuppetPreview = ({ proportions }) => {
     const cx = w / 2;
     const groundY = h - 30;
 
-    // Colors
     const skinColor = "#d4a574";
     const bodyColor = "#6366f1";
     const hairColor = "#2d1b4e";
 
-    // Calculate positions from bottom up
     const totalLegLen = style.upperLegLength + style.lowerLegLength;
     const hipY = groundY - totalLegLen;
     const shoulderY = hipY - style.bodyHeight;
     const neckY = shoulderY - 8;
     const headY = neckY - style.headRadius;
 
-    // Helper: draw rounded rect limb
     const drawLimb = (x1, y1, x2, y2, thickness, color) => {
       ctx.strokeStyle = color;
       ctx.lineWidth = thickness;
@@ -57,11 +56,8 @@ const PuppetPreview = ({ proportions }) => {
     const legSpread = style.bodyWidth * 0.35;
     const kneeY = hipY + style.upperLegLength;
 
-    // Left leg
     drawLimb(cx - legSpread, hipY, cx - legSpread - 2, kneeY, style.limbWidth + 2, skinColor);
     drawLimb(cx - legSpread - 2, kneeY, cx - legSpread, groundY, style.limbWidth, skinColor);
-
-    // Right leg
     drawLimb(cx + legSpread, hipY, cx + legSpread + 2, kneeY, style.limbWidth + 2, skinColor);
     drawLimb(cx + legSpread + 2, kneeY, cx + legSpread, groundY, style.limbWidth, skinColor);
 
@@ -74,7 +70,7 @@ const PuppetPreview = ({ proportions }) => {
     ctx.ellipse(cx + legSpread, groundY, style.footWidth / 2, style.footHeight / 2, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Torso (tapered shape)
+    // Torso
     const shoulderW = style.bodyWidth / 2 + style.shoulderWidthOffset;
     const hipW = style.bodyWidth / 2 + style.hipWidthOffset;
     const waistW = Math.min(shoulderW, hipW) - style.waistNarrow;
@@ -89,7 +85,6 @@ const PuppetPreview = ({ proportions }) => {
     ctx.closePath();
     ctx.fill();
 
-    // Chest highlight
     if (style.chestOffset > 3) {
       ctx.fillStyle = "rgba(255,255,255,0.08)";
       ctx.beginPath();
@@ -101,11 +96,8 @@ const PuppetPreview = ({ proportions }) => {
     const elbowOffsetY = style.upperArmLength;
     const armThick = style.limbWidth;
 
-    // Left arm
     drawLimb(cx - shoulderW, shoulderY + 5, cx - shoulderW - 15, shoulderY + elbowOffsetY, armThick, skinColor);
     drawLimb(cx - shoulderW - 15, shoulderY + elbowOffsetY, cx - shoulderW - 10, shoulderY + elbowOffsetY + style.lowerArmLength, armThick - 1, skinColor);
-
-    // Right arm
     drawLimb(cx + shoulderW, shoulderY + 5, cx + shoulderW + 15, shoulderY + elbowOffsetY, armThick, skinColor);
     drawLimb(cx + shoulderW + 15, shoulderY + elbowOffsetY, cx + shoulderW + 10, shoulderY + elbowOffsetY + style.lowerArmLength, armThick - 1, skinColor);
 
@@ -128,7 +120,6 @@ const PuppetPreview = ({ proportions }) => {
     ctx.arc(cx, headY, style.headRadius, 0, Math.PI * 2);
     ctx.fill();
 
-    // Hair
     ctx.fillStyle = hairColor;
     ctx.beginPath();
     ctx.arc(cx, headY - 3, style.headRadius + 2, Math.PI, Math.PI * 2);
@@ -147,13 +138,11 @@ const PuppetPreview = ({ proportions }) => {
     ctx.arc(cx + eyeSpread, eyeY, eyeR, 0, Math.PI * 2);
     ctx.fill();
 
-    // Mouth
     ctx.strokeStyle = "#8B6F5E";
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.arc(cx, headY + style.headRadius * 0.3, style.headRadius * 0.2, 0, Math.PI);
     ctx.stroke();
-
   }, [proportions]);
 
   return (
@@ -166,39 +155,93 @@ const PuppetPreview = ({ proportions }) => {
   );
 };
 
-// 3D preview using model-viewer or Three.js (placeholder for now, wires into existing avatar)
-const Avatar3DPreview = ({ proportions }) => {
-  const containerRef = useRef(null);
-
-  // This would connect to your existing Three.js avatar viewer
-  // For now, show bone scale values as a reference
-  return (
-    <div className="avatar-3d-preview" ref={containerRef}>
-      <div className="avatar-3d-placeholder">
-        <div className="avatar-3d-icon">🧍</div>
-        <p>3D Preview</p>
-        <p className="avatar-3d-hint">
-          Connect your rigged avatar to see<br />
-          bone scaling applied in real-time
-        </p>
-      </div>
-    </div>
-  );
-};
-
+// ─── Main Page ───
 const BodyCustomizerPage = () => {
   const { store, actions } = useContext(Context);
   const [proportions, setProportions] = useState({ ...DEFAULT_PROPORTIONS });
   const [activePreset, setActivePreset] = useState("average");
   const [saveStatus, setSaveStatus] = useState(null);
-  const [previewMode, setPreviewMode] = useState("2d"); // "2d" | "3d" | "both"
+  const [previewMode, setPreviewMode] = useState("2d");
+
+  // 3D model state
+  const [modelUrl, setModelUrl] = useState(null);
+  const [savedAvatars, setSavedAvatars] = useState([]);
+  const fileInputRef = useRef(null);
+
+  // Load saved avatars list on mount
+  useEffect(() => {
+    const loadAvatars = async () => {
+      try {
+        const token = sessionStorage.getItem("token") || localStorage.getItem("token");
+        if (!token) return;
+        const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/avatars`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setSavedAvatars(data.avatars || []);
+        }
+      } catch (err) {
+        console.log("Could not load avatars:", err);
+      }
+    };
+    loadAvatars();
+  }, []);
+
+  // Load saved body type on mount
+  useEffect(() => {
+    const loadBodyType = async () => {
+      try {
+        const token = sessionStorage.getItem("token") || localStorage.getItem("token");
+        if (!token) return;
+        const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/body-type`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.proportions) {
+            setProportions(data.proportions);
+            setActivePreset(data.preset || null);
+          }
+        }
+      } catch (err) {
+        console.log("Could not load body type:", err);
+      }
+    };
+    loadBodyType();
+  }, []);
 
   const handleProportionsChange = useCallback((newProportions, preset) => {
     setProportions(newProportions);
     setActivePreset(preset);
   }, []);
 
-  // Save body type to backend
+  // Upload GLB file directly from disk
+  const handleModelUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const url = URL.createObjectURL(file);
+    setModelUrl(url);
+
+    // Auto-switch to 3D or both view
+    if (previewMode === "2d") {
+      setPreviewMode("both");
+    }
+  };
+
+  // Select a saved avatar
+  const handleSelectAvatar = (avatarPath) => {
+    const backendUrl = process.env.REACT_APP_BACKEND_URL || "";
+    const url = avatarPath.startsWith("http") ? avatarPath : `${backendUrl}${avatarPath}`;
+    setModelUrl(url);
+
+    if (previewMode === "2d") {
+      setPreviewMode("both");
+    }
+  };
+
+  // Save body type
   const handleSave = async () => {
     try {
       setSaveStatus("saving");
@@ -235,6 +278,7 @@ const BodyCustomizerPage = () => {
       preset: activePreset,
       proportions: proportions,
       puppetStyle: proportionsToPuppetStyle(proportions),
+      boneScales: proportionsToBoneScales(proportions),
     };
 
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
@@ -302,6 +346,68 @@ const BodyCustomizerPage = () => {
             initialProportions={proportions}
             initialPreset={activePreset}
           />
+
+          {/* 3D Model loader */}
+          <div className="bcp-model-loader">
+            <h6 className="bcp-model-loader-title">3D Avatar Model</h6>
+
+            {/* Upload button */}
+            <button
+              className="bcp-upload-model-btn"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              📂 Upload GLB / GLTF
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".glb,.gltf"
+              onChange={handleModelUpload}
+              hidden
+            />
+
+            {/* Saved avatars list */}
+            {savedAvatars.length > 0 && (
+              <div className="bcp-saved-avatars">
+                <span className="bcp-saved-avatars-label">Your Avatars:</span>
+                {savedAvatars.map((avatar, i) => (
+                  <button
+                    key={i}
+                    className={`bcp-avatar-pick ${modelUrl && modelUrl.includes(avatar.file_path) ? "bcp-avatar-pick--active" : ""}`}
+                    onClick={() => handleSelectAvatar(avatar.file_path)}
+                    title={avatar.name || `Avatar ${i + 1}`}
+                  >
+                    {avatar.name || `Avatar ${i + 1}`}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Quick hint */}
+            {!modelUrl && (
+              <p className="bcp-model-hint">
+                Upload any Mixamo-rigged GLB to see bone scaling live.
+                Works with avatars from Upload Selfie → Rig flow.
+              </p>
+            )}
+
+            {modelUrl && (
+              <button
+                className="bcp-clear-model-btn"
+                onClick={() => { setModelUrl(null); setPreviewMode("2d"); }}
+              >
+                ✕ Remove Model
+              </button>
+            )}
+          </div>
+
+          {/* Bone scale debug */}
+          <details className="bcp-bone-debug">
+            <summary>🦴 Bone Scale Values</summary>
+            <pre className="bcp-bone-debug-pre">
+              {JSON.stringify(proportionsToBoneScales(proportions), null, 2)}
+            </pre>
+          </details>
         </div>
 
         {/* Center: Preview */}
@@ -336,8 +442,11 @@ const BodyCustomizerPage = () => {
               </div>
             )}
             {(previewMode === "3d" || previewMode === "both") && (
-              <div className="bcp-preview-panel">
-                <Avatar3DPreview proportions={proportions} />
+              <div className="bcp-preview-panel bcp-preview-panel--3d">
+                <Avatar3DPreview
+                  proportions={proportions}
+                  modelUrl={modelUrl}
+                />
                 <span className="bcp-preview-label">3D Avatar</span>
               </div>
             )}
