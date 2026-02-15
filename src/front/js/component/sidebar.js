@@ -15,6 +15,7 @@ const sidebarSections = [
       { to: "/upload", label: "Upload Selfie" },
       { to: "/customize", label: "Customize" },
       { to: "/rig", label: "Rig Avatar" },
+      { to: "/body-customizer", label: "Body Type" },
       { to: "/illustration-to-3d", label: "Drawing to 3D" },
       { to: "/export-avatar", label: "Export" },
     ],

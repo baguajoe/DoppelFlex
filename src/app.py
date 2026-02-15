@@ -14,6 +14,8 @@ from flask_cors import CORS
 from flask_socketio import SocketIO, emit
 from api.avatar_routes import avatar_api, register_avatar_routes
 from api.illustration_routes import illustration_api
+from api.body_type_routes import body_type_api
+
 from datetime import timedelta
 
 
@@ -51,6 +53,7 @@ setup_commands(app)
 # Register API blueprint
 app.register_blueprint(api, url_prefix='/api')
 app.register_blueprint(illustration_api)
+app.register_blueprint(body_type_api)
 register_avatar_routes(app)
 
 

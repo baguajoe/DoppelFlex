@@ -1,0 +1,252 @@
+/* src/front/styles/BodyCustomizer.css */
+
+.body-customizer {
+  background: #12121e;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 16px;
+  max-width: 360px;
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+/* Section titles */
+.bc-section-title {
+  color: #a0a0c0;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin: 0 0 10px 0;
+}
+
+/* Presets header with action buttons */
+.bc-presets-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2px;
+}
+
+.bc-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.bc-action-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  color: #888;
+  font-size: 14px;
+  width: 30px;
+  height: 30px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.bc-action-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ccc;
+}
+
+/* Preset grid */
+.bc-preset-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.bc-preset-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  padding: 8px 4px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  transition: all 0.15s ease;
+  color: #888;
+}
+
+.bc-preset-card:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #bbb;
+}
+
+.bc-preset-card--active {
+  background: rgba(99, 102, 241, 0.15);
+  border-color: rgba(99, 102, 241, 0.4);
+  color: #a78bfa;
+}
+
+.bc-preset-card--active:hover {
+  background: rgba(99, 102, 241, 0.2);
+}
+
+.bc-preset-emoji {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.bc-preset-label {
+  font-size: 9px;
+  font-weight: 500;
+  text-align: center;
+  line-height: 1.1;
+}
+
+/* Slider groups */
+.bc-sliders {
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding-top: 12px;
+}
+
+.bc-slider-group {
+  margin-bottom: 4px;
+}
+
+.bc-group-header {
+  width: 100%;
+  background: none;
+  border: none;
+  color: #8888aa;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 4px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+
+.bc-group-header:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: #aaa;
+}
+
+.bc-group-header--open {
+  color: #c0c0e0;
+}
+
+.bc-chevron {
+  transition: transform 0.2s ease;
+  color: currentColor;
+}
+
+.bc-chevron--open {
+  transform: rotate(180deg);
+}
+
+/* Slider list */
+.bc-slider-list {
+  padding: 4px 0 8px 0;
+}
+
+.bc-slider-row {
+  padding: 4px 4px;
+}
+
+.bc-slider-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2px;
+}
+
+.bc-slider-label {
+  color: #999;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.bc-slider-value {
+  color: #6366f1;
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.bc-slider-track-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bc-slider-min,
+.bc-slider-max {
+  color: #555;
+  font-size: 9px;
+  min-width: 32px;
+  white-space: nowrap;
+}
+
+.bc-slider-min {
+  text-align: right;
+}
+
+.bc-slider-max {
+  text-align: left;
+}
+
+/* Range slider styling */
+.bc-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: 1;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+.bc-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #6366f1;
+  border: 2px solid #1a1a2e;
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+
+.bc-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+.bc-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #6366f1;
+  border: 2px solid #1a1a2e;
+  cursor: pointer;
+}
+
+.bc-slider::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+}
+
+/* Custom indicator */
+.bc-custom-indicator {
+  text-align: center;
+  color: #6366f1;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 6px;
+  margin-top: 8px;
+  background: rgba(99, 102, 241, 0.08);
+  border-radius: 6px;
+}

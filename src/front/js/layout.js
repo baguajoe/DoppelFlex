@@ -35,6 +35,7 @@ import FaceCapturePage from './pages/FaceCapturePage';
 import FullBodyCapturePage from './pages/FullBodyCapturePage';
 import IllustrationTo3DPage from './pages/IllustrationTo3DPage';
 import Live2DAvatarPage from './pages/Live2DAvatarPage';
+import BodyCustomizerPage from './pages/BodyCustomizerPage';
 
 
 const Layout = () => {
@@ -54,6 +55,7 @@ const Layout = () => {
               <Route path="/avatar-view" element={<AvatarViewPage />} />
               <Route path="/export-avatar" element={<AvatarExportPage />} />
               <Route path="/illustration-to-3d" element={<IllustrationTo3DPage />} />
+              <Route path="/body-customizer" element={<BodyCustomizerPage />} />
 
               {/* Motion Capture */}
               <Route path="/motion" element={<MotionCapturePage />} />
@@ -117,4 +119,4 @@ const Layout = () => {
   );
 };
 
-export default injectContext(Layout)
+export default injectContext(Layout);

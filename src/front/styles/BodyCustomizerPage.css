@@ -1,0 +1,262 @@
+/* src/front/styles/BodyCustomizerPage.css */
+
+.body-customizer-page {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+/* Header */
+.bcp-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.bcp-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #e0e0f0;
+  margin: 0 0 4px 0;
+}
+
+.bcp-subtitle {
+  color: #666;
+  font-size: 13px;
+  margin: 0;
+}
+
+.bcp-header-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.bcp-save-btn,
+.bcp-export-btn,
+.bcp-import-btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: all 0.15s ease;
+}
+
+.bcp-save-btn {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: white;
+  border: none;
+}
+
+.bcp-save-btn:hover {
+  background: linear-gradient(135deg, #5558e6, #7c4feb);
+  transform: translateY(-1px);
+}
+
+.bcp-save-btn--saved {
+  background: linear-gradient(135deg, #10b981, #059669);
+}
+
+.bcp-save-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.bcp-export-btn {
+  background: rgba(255, 255, 255, 0.05);
+  color: #aaa;
+}
+
+.bcp-export-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ddd;
+}
+
+.bcp-import-btn {
+  background: rgba(255, 255, 255, 0.05);
+  color: #aaa;
+  display: inline-flex;
+  align-items: center;
+}
+
+.bcp-import-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ddd;
+}
+
+/* Main layout */
+.bcp-layout {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.bcp-controls {
+  flex-shrink: 0;
+  width: 360px;
+}
+
+.bcp-preview {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Preview tabs */
+.bcp-preview-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  padding: 3px;
+  width: fit-content;
+}
+
+.bcp-tab {
+  padding: 6px 16px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: #666;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.bcp-tab:hover {
+  color: #aaa;
+}
+
+.bcp-tab--active {
+  background: rgba(99, 102, 241, 0.15);
+  color: #a78bfa;
+}
+
+/* Preview area */
+.bcp-preview-area {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+}
+
+.bcp-preview-area--split {
+  justify-content: center;
+}
+
+.bcp-preview-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.bcp-preview-label {
+  color: #555;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* 2D puppet canvas */
+.puppet-preview-canvas {
+  background: #0a0a14;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+}
+
+/* 3D preview placeholder */
+.avatar-3d-preview {
+  width: 280px;
+  height: 480px;
+  background: #0a0a14;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.avatar-3d-placeholder {
+  text-align: center;
+  color: #444;
+}
+
+.avatar-3d-icon {
+  font-size: 48px;
+  margin-bottom: 8px;
+  opacity: 0.5;
+}
+
+.avatar-3d-placeholder p {
+  margin: 0;
+  font-size: 13px;
+}
+
+.avatar-3d-hint {
+  font-size: 11px !important;
+  color: #333 !important;
+  margin-top: 8px !important;
+  line-height: 1.4;
+}
+
+/* Active preset badge */
+.bcp-active-preset {
+  text-align: center;
+  margin-top: 16px;
+}
+
+.bcp-preset-badge {
+  display: inline-block;
+  background: rgba(99, 102, 241, 0.1);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  color: #a78bfa;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 20px;
+}
+
+.bcp-preset-badge--custom {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: #888;
+}
+
+.bcp-preset-badge-desc {
+  color: #666;
+  font-weight: 400;
+  font-size: 12px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .bcp-layout {
+    flex-direction: column;
+  }
+
+  .bcp-controls {
+    width: 100%;
+  }
+
+  .body-customizer {
+    max-width: 100%;
+  }
+
+  .bcp-preview-area--split {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .puppet-preview-canvas,
+  .avatar-3d-preview {
+    width: 240px;
+    height: 400px;
+  }
+}

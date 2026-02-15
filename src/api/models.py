@@ -14,6 +14,8 @@ class User(db.Model):
     password_hash = db.Column(db.String(500), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     subscription_plan = db.Column(db.String(50), default="Basic")  # Basic, Pro, Premium
+    body_type_preset = db.Column(db.String(50), nullable=True)              # e.g. "athletic", "slim", "curvy", or null for custom
+    body_type_proportions = db.Column(db.Text, nullable=True) 
 
     # DO NOT define `usage = db.relationship(...)` here — it's created via backref from UserUsage
     avatars = db.relationship('Avatar', backref='user', lazy=True)
