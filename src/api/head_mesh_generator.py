@@ -1,78 +1,309 @@
 # src/api/head_mesh_generator.py
-# Full Head Avatar Generator
-# 1. Generates a template head mesh (UV sphere with head proportions)
-# 2. Deforms front vertices using MediaPipe face landmarks
-# 3. Refines depth using MiDaS monocular depth estimation
-# Result: Complete 360° head mesh with personalized face shape
+# Full Head Avatar Generator - HYBRID approach (COMPLETE + ROBUST)
+# Front face: MediaPipe landmark positions (real face shape)
+# Triangulation: Uses MediaPipe FACEMESH_TESSELATION topology when available
+# Back/sides: Template back shell placed BEHIND the face plane
+# Seam: Angle-sorted face boundary + stable stitch
+# Depth: Optional MiDaS refinement with consistent coordinate mapping
+# Neck: Proportional neck
+# Cleanup: remove degenerate/duplicate faces, merge vertices, fix normals
+#
+# IMPORTANT:
+# - This file includes a robust import block that works across MediaPipe layouts:
+#     mediapipe.solutions..., mediapipe.python.solutions..., or mp.solutions...
+# - If topology is unavailable, it falls back to Delaunay (less ideal).
+# - This version also compresses the MediaPipe depth curve so the nose
+#   does not inflate disproportionately.
 
 import numpy as np
 import cv2
-import os
 import trimesh
+import scipy.spatial as sp
 
-# ─── Step 1: Template Head Mesh ───
-def generate_template_head(resolution=32):
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Scaling constants (MUST MATCH your existing landmark->mesh mapping)
+# ──────────────────────────────────────────────────────────────────────────────
+X_SCALE = 0.24
+Y_SCALE = 0.30
+Y_OFFSET = 0.85
+Z_SCALE = 0.15
+Z_OFFSET = 0.12
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Robust MediaPipe topology import (works across versions/layouts)
+# ──────────────────────────────────────────────────────────────────────────────
+FACEMESH_TESSELATION = None
+try:
+    # Older/common layout
+    from mediapipe.solutions.face_mesh_connections import FACEMESH_TESSELATION as _TESS
+    FACEMESH_TESSELATION = _TESS
+except Exception:
+    try:
+        # Some builds expose this layout
+        from mediapipe.python.solutions.face_mesh_connections import FACEMESH_TESSELATION as _TESS
+        FACEMESH_TESSELATION = _TESS
+    except Exception:
+        try:
+            # Fallback via mp.solutions
+            import mediapipe as mp
+            FACEMESH_TESSELATION = mp.solutions.face_mesh.FACEMESH_TESSELATION
+        except Exception:
+            FACEMESH_TESSELATION = None
+            print("[HeadGen] WARNING: MediaPipe topology unavailable — using fallback triangulation")
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# DEPTH COMPRESSION (prevents nose inflation)
+# ──────────────────────────────────────────────────────────────────────────────
+
+def normalize_face_depth(z_values, strength=0.55):
     """
-    Create a UV sphere shaped like a human head.
-    Returns vertices, faces, and UV coordinates.
-    Head proportions: slightly taller than wide, flattened at back.
+    Compress MediaPipe depth so nose doesn't inflate.
+    strength:
+      - lower (0.45) = more compression (smaller nose)
+      - higher (0.65) = more depth (bigger nose)
     """
-    lat_steps = resolution
-    lon_steps = resolution * 2
+    z = np.asarray(z_values, dtype=np.float32)
+
+    # center around 0
+    z = z - float(z.mean())
+
+    # nonlinear compression
+    z = np.sign(z) * (np.abs(z) ** float(strength))
+
+    # normalize to [-1, 1]
+    z = z / (float(np.max(np.abs(z))) + 1e-6)
+    return z
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Main generator
+# ──────────────────────────────────────────────────────────────────────────────
+
+def generate_full_head(
+    image_path,
+    face_landmarks,
+    image_shape,
+    resolution=32,
+    use_depth=True,
+    depth_strength=0.03
+):
+    """
+    Hybrid pipeline:
+    1) Extract face points from MediaPipe landmarks (real face shape)
+    2) Triangulate face using MediaPipe topology (prevents mask plates/spikes)
+    3) Generate back shell behind face plane
+    4) Merge + stitch seam
+    5) Optional MiDaS depth refinement on face only
+    6) Add neck
+    7) Cleanup mesh
+    """
+    print("[HeadGen] Starting hybrid head generation...")
+
+    landmarks = face_landmarks.landmark
+
+    # ─── Step 1: Extract 3D face points from landmarks (with depth compression) ───
+    print("[HeadGen] Step 1: Extracting face landmark positions...")
+
+    # MediaPipe z is usually negative toward the camera.
+    # Convert to "forward-positive" then compress so the nose doesn't balloon.
+    raw_z = np.array([lm.z for lm in landmarks], dtype=np.float32)
+    forward_z = -raw_z
+    depth_curve = normalize_face_depth(forward_z, strength=0.55)
+
+    face_points = []
+    for i, lm in enumerate(landmarks):
+        x = (lm.x - 0.5) * X_SCALE
+        y = (0.5 - lm.y) * Y_SCALE + Y_OFFSET
+        z = depth_curve[i] * Z_SCALE + Z_OFFSET
+        face_points.append([x, y, z])
+
+    face_points = np.array(face_points, dtype=np.float32)
+    print(f"  -> {len(face_points)} face landmarks")
+
+    # ─── Step 2: Triangulate face surface ───
+    print("[HeadGen] Step 2: Triangulating face surface...")
+    face_faces = triangulate_face(face_points)
+    print(f"  -> {len(face_faces)} face triangles")
+
+    # ─── Step 3: Generate back-of-head shell ───
+    print("[HeadGen] Step 3: Generating back-of-head shell...")
+    back_verts, back_faces = generate_back_shell(face_points, resolution=resolution)
+    print(f"  -> {len(back_verts)} back vertices, {len(back_faces)} back faces")
+
+    # ─── Step 4: Merge front face + back shell ───
+    print("[HeadGen] Step 4: Merging front and back...")
+    num_face_verts = len(face_points)
+    back_faces_offset = back_faces + num_face_verts
+
+    all_verts = np.vstack([face_points, back_verts])
+    all_faces = np.vstack([face_faces, back_faces_offset])
+
+    # ─── Step 5: Stitch seam ───
+    print("[HeadGen] Step 5: Stitching face-to-back seam...")
+    stitch_faces = stitch_face_to_back(face_points, back_verts, face_vert_offset=num_face_verts)
+    if len(stitch_faces) > 0:
+        all_faces = np.vstack([all_faces, np.asarray(stitch_faces, dtype=np.int64)])
+    print(f"  -> {len(stitch_faces)} stitch faces")
+
+    # ─── Step 6: Optional MiDaS depth refinement ───
+    if use_depth:
+        print("[HeadGen] Step 6: Applying MiDaS depth refinement...")
+        all_verts = refine_face_depth(
+            vertices=all_verts,
+            image_path=image_path,
+            num_face_verts=num_face_verts,
+            depth_strength=depth_strength
+        )
+    else:
+        print("[HeadGen] Step 6: Depth refinement skipped")
+
+    # ─── Step 7: Add neck ───
+    print("[HeadGen] Step 7: Adding neck...")
+    all_verts, all_faces = add_neck(all_verts, all_faces, resolution=resolution)
+
+    # ─── Step 8: Build mesh + cleanup ───
+    print("[HeadGen] Step 8: Building final mesh + cleanup...")
+    mesh = trimesh.Trimesh(vertices=all_verts, faces=all_faces, process=False)
+
+    cleanup_mesh(mesh)
+
+    # Light smoothing (safe)
+    try:
+        trimesh.smoothing.filter_laplacian(mesh, iterations=1, lamb=0.25)
+    except Exception:
+        pass
+
+    mesh.fix_normals()
+
+    print(f"[HeadGen] Done: {len(mesh.vertices)} vertices, {len(mesh.faces)} faces")
+    return mesh
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# TRIANGULATION (MediaPipe topology preferred)
+# ──────────────────────────────────────────────────────────────────────────────
+
+def triangulate_face(face_points):
+    """
+    Best: Build triangles from MediaPipe FACEMESH_TESSELATION edges.
+    Fallback: Delaunay on XY with filtering (can cause artifacts, but won't crash).
+    """
+    if FACEMESH_TESSELATION is not None:
+        print("[HeadGen] Using MediaPipe tessellation topology...")
+        faces = build_triangles_from_tessellation(FACEMESH_TESSELATION)
+
+        # Safety filter: remove triangles that are too large (helps boundary artifacts)
+        faces = filter_large_triangles(face_points, faces, max_edge=0.09)
+
+        # If we get a healthy amount of faces, return.
+        if len(faces) > 500:
+            return faces
+
+        print("[HeadGen] Tessellation produced too few faces, falling back to Delaunay.")
+
+    # Fallback Delaunay (less ideal)
+    tri = sp.Delaunay(face_points[:, :2])
+    faces = tri.simplices.astype(np.int64)
+    faces = filter_large_triangles(face_points, faces, max_edge=0.08)
+    return faces
+
+
+def build_triangles_from_tessellation(tessellation_edges):
+    """
+    MediaPipe provides a set of edges (vertex index pairs). We reconstruct triangles
+    by finding 3-cycles in the adjacency graph.
+
+    Returns:
+        np.ndarray (N, 3) int64 triangles
+    """
+    from collections import defaultdict
+
+    edge_set = set()
+    for a, b in tessellation_edges:
+        if a == b:
+            continue
+        edge_set.add((a, b) if a < b else (b, a))
+
+    neighbors = defaultdict(set)
+    for a, b in edge_set:
+        neighbors[a].add(b)
+        neighbors[b].add(a)
+
+    triangles = set()
+    for v, ns in neighbors.items():
+        ns = sorted(ns)
+        for i in range(len(ns)):
+            n1 = ns[i]
+            for j in range(i + 1, len(ns)):
+                n2 = ns[j]
+                if n2 in neighbors[n1]:
+                    triangles.add(tuple(sorted((v, n1, n2))))
+
+    if not triangles:
+        return np.zeros((0, 3), dtype=np.int64)
+
+    return np.array(list(triangles), dtype=np.int64)
+
+
+def filter_large_triangles(verts, faces, max_edge=0.08):
+    """Remove triangles with any edge longer than max_edge."""
+    good = []
+    for f in faces:
+        pts = verts[f]
+        e0 = np.linalg.norm(pts[0] - pts[1])
+        e1 = np.linalg.norm(pts[1] - pts[2])
+        e2 = np.linalg.norm(pts[2] - pts[0])
+        if max(e0, e1, e2) <= max_edge:
+            good.append(f)
+    return np.asarray(good, dtype=np.int64) if good else faces.astype(np.int64)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# BACK SHELL (placed BEHIND face plane)
+# ──────────────────────────────────────────────────────────────────────────────
+
+def generate_back_shell(face_points, resolution=32):
+    """
+    Generate the back half of the head as a half-sphere shell.
+    Sized and positioned to match the face boundary.
+    Key: placed BEHIND face plane to avoid stacking on face.
+    """
+    face_center_x = float(face_points[:, 0].mean())
+    face_center_y = float(face_points[:, 1].mean())
+    face_width = float(face_points[:, 0].max() - face_points[:, 0].min())
+    face_height = float(face_points[:, 1].max() - face_points[:, 1].min())
+    face_z_min = float(face_points[:, 2].min())
+
+    radius_x = max(face_width * 0.60, 0.04)
+    radius_y = max(face_height * 0.58, 0.05)
+    radius_z = max(face_width * 0.55, 0.04)
+
+    back_center_z = face_z_min - radius_z * 0.18
+
+    lat_steps = max(8, resolution // 2)
+    lon_steps = max(16, resolution)
 
     vertices = []
-    uvs = []
 
     for i in range(lat_steps + 1):
-        theta = np.pi * i / lat_steps  # 0 to pi (top to bottom)
-        v = i / lat_steps
-
+        theta = np.pi * i / lat_steps
         for j in range(lon_steps + 1):
-            phi = 2 * np.pi * j / lon_steps  # 0 to 2pi (around)
-            u = j / lon_steps
+            phi = np.pi + np.pi * j / lon_steps
 
-            # Base sphere
-            x = np.sin(theta) * np.cos(phi)
-            y = np.cos(theta)
-            z = np.sin(theta) * np.sin(phi)
+            x = radius_x * np.sin(theta) * np.cos(phi) + face_center_x
+            y = radius_y * np.cos(theta) + face_center_y
+            z = radius_z * np.sin(theta) * np.sin(phi) + back_center_z
 
-            # Head shape modifiers
-            # Slightly taller than wide (1.15x height)
-            y *= 1.15
+            if z < back_center_z - radius_z * 0.55:
+                z = z * 0.92 + (back_center_z - radius_z * 0.55) * 0.08
 
-            # Narrow the chin area (bottom quarter)
-            chin_factor = max(0, (theta - np.pi * 0.65) / (np.pi * 0.35))
-            if chin_factor > 0:
-                narrow = 1.0 - chin_factor * 0.35
-                x *= narrow
-                z *= narrow
+            vertices.append([x, y, z])
 
-            # Slight forehead bulge (top front)
-            forehead_factor = max(0, 1.0 - theta / (np.pi * 0.3))
-            if forehead_factor > 0 and z > 0:
-                z += forehead_factor * 0.08
+    vertices = np.array(vertices, dtype=np.float32)
 
-            # Flatten back of head slightly
-            if z < -0.1:
-                z *= 0.85
-
-            # Nose bridge area - slight protrusion
-            nose_lat = abs(theta - np.pi * 0.45) < np.pi * 0.08
-            nose_lon = abs(phi - np.pi * 0.5) < 0.3 or abs(phi - np.pi * 1.5) < 0.3
-            if nose_lat and z > 0.3:
-                z += 0.06
-
-            # Brow ridge
-            brow_lat = abs(theta - np.pi * 0.35) < np.pi * 0.04
-            if brow_lat and z > 0.2:
-                z += 0.04
-
-            # Scale to realistic head size (in normalized coords ~0.2 units)
-            scale = 0.12
-            vertices.append([x * scale, y * scale + 0.85, z * scale])
-            uvs.append([u, v])
-
-    # Generate faces (triangles)
     faces = []
     for i in range(lat_steps):
         for j in range(lon_steps):
@@ -80,131 +311,96 @@ def generate_template_head(resolution=32):
             v1 = v0 + 1
             v2 = (i + 1) * (lon_steps + 1) + j
             v3 = v2 + 1
-
             faces.append([v0, v2, v1])
             faces.append([v1, v2, v3])
 
-    return np.array(vertices), np.array(faces), np.array(uvs)
+    return vertices, np.asarray(faces, dtype=np.int64)
 
 
-# ─── Step 2: Landmark-based Deformation ───
-def get_front_vertex_mask(vertices, threshold=0.0):
-    """Identify vertices on the front of the head (z > threshold)."""
-    return vertices[:, 2] > threshold
+# ──────────────────────────────────────────────────────────────────────────────
+# STITCH SEAM (ordered boundary loop)
+# ──────────────────────────────────────────────────────────────────────────────
 
-
-def map_landmarks_to_3d(landmarks_2d, image_shape):
+def stitch_face_to_back(face_points, back_verts, face_vert_offset):
     """
-    Convert MediaPipe face landmarks from normalized [0,1] coords
-    to 3D head-space coordinates.
-    Returns Nx3 array of landmark positions.
+    Create triangles connecting face boundary to the 'front-most' ring
+    of the back shell. Boundary is angle-sorted to avoid crisscross stitching.
     """
-    h, w = image_shape[:2]
-    points = []
-    for lm in landmarks_2d:
-        # MediaPipe gives x,y in [0,1], z is relative depth
-        x = (lm.x - 0.5) * 0.24  # Center and scale to head width
-        y = (0.5 - lm.y) * 0.28 + 0.85  # Flip Y, scale to head height, offset to head center
-        z = lm.z * 0.12 + 0.12  # Scale depth, offset to front of head
-        points.append([x, y, z])
-    return np.array(points)
+    from scipy.spatial import ConvexHull
+
+    try:
+        hull = ConvexHull(face_points[:, :2])
+        boundary = list(hull.vertices)
+    except Exception:
+        center = face_points.mean(axis=0)
+        r = np.linalg.norm(face_points[:, :2] - center[:2], axis=1)
+        boundary = np.where(r >= np.quantile(r, 0.85))[0].tolist()
+
+    if len(boundary) < 10:
+        return []
+
+    c2 = face_points[boundary][:, :2].mean(axis=0)
+    ang = np.arctan2(face_points[boundary][:, 1] - c2[1],
+                     face_points[boundary][:, 0] - c2[0])
+    boundary = [boundary[i] for i in np.argsort(ang)]
+
+    z = back_verts[:, 2]
+    z_thresh = np.quantile(z, 0.92)
+    shell_ring = np.where(z >= z_thresh)[0]
+    if len(shell_ring) < 10:
+        shell_ring = np.where(z >= np.quantile(z, 0.90))[0]
+    if len(shell_ring) < 10:
+        return []
+
+    shell_pts = back_verts[shell_ring]
+
+    nearest_shell = []
+    for fi in boundary:
+        fp = face_points[fi]
+        d = np.linalg.norm(shell_pts - fp, axis=1)
+        nearest_shell.append(shell_ring[int(np.argmin(d))])
+
+    stitch_faces = []
+    n = len(boundary)
+    for i in range(n):
+        f0 = boundary[i]
+        f1 = boundary[(i + 1) % n]
+        b0 = nearest_shell[i] + face_vert_offset
+        b1 = nearest_shell[(i + 1) % n] + face_vert_offset
+
+        stitch_faces.append([f0, f1, b0])
+        stitch_faces.append([f1, b1, b0])
+
+    return stitch_faces
 
 
-# Key landmark indices for face regions
-FACE_REGIONS = {
-    "jaw": list(range(0, 17)),  # Jawline contour (using face oval)
-    "left_eye": [33, 160, 158, 133, 153, 144],
-    "right_eye": [362, 385, 387, 263, 373, 380],
-    "nose": [1, 2, 98, 327, 168],
-    "mouth": [61, 291, 0, 17, 78, 308],
-    "left_brow": [70, 63, 105, 66, 107],
-    "right_brow": [300, 293, 334, 296, 336],
-    "forehead": [10, 338, 297, 332, 284, 251, 389, 356, 454],
-    "chin": [152, 148, 176, 149, 150, 136, 172, 58, 132],
-    "left_cheek": [50, 101, 36, 205, 187, 123, 116, 117],
-    "right_cheek": [280, 330, 266, 425, 411, 352, 345, 346],
-    "face_oval": [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361,
-                  288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149,
-                  150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54,
-                  103, 67, 109],
-}
+# ──────────────────────────────────────────────────────────────────────────────
+# MIDAS DEPTH REFINEMENT (consistent mapping)
+# ──────────────────────────────────────────────────────────────────────────────
 
-
-def deform_to_landmarks(vertices, face_landmarks_3d, strength=0.7):
+def refine_face_depth(vertices, image_path, num_face_verts, depth_strength=0.03):
     """
-    Deform front-facing head vertices to match face landmark positions.
-    Uses radial basis function interpolation for smooth deformation.
-    """
-    front_mask = get_front_vertex_mask(vertices, threshold=0.0)
-
-    # Use face oval landmarks as primary deformation targets
-    oval_indices = FACE_REGIONS["face_oval"]
-    available = [i for i in oval_indices if i < len(face_landmarks_3d)]
-
-    if len(available) < 5:
-        print("[HeadGen] Warning: Too few landmarks for deformation")
-        return vertices
-
-    target_points = face_landmarks_3d[available]
-
-    # For each front vertex, find nearest landmarks and blend toward them
-    deformed = vertices.copy()
-
-    for vi in range(len(vertices)):
-        if not front_mask[vi]:
-            continue
-
-        vert = vertices[vi]
-
-        # Distance to all target landmarks
-        diffs = target_points - vert
-        dists = np.sqrt(np.sum(diffs ** 2, axis=1))
-
-        # Use closest 4 landmarks with inverse-distance weighting
-        closest = np.argsort(dists)[:4]
-        weights = 1.0 / (dists[closest] + 1e-6)
-        weights /= weights.sum()
-
-        # Compute weighted displacement
-        displacement = np.zeros(3)
-        for idx, w in zip(closest, weights):
-            target = target_points[idx]
-            displacement += w * (target - vert)
-
-        # Apply with falloff based on distance from face center
-        face_center = face_landmarks_3d[1]  # Nose tip as center
-        dist_from_center = np.linalg.norm(vert[:2] - face_center[:2])
-        falloff = np.exp(-dist_from_center * 8)
-
-        deformed[vi] += displacement * strength * falloff
-
-    return deformed
-
-
-# ─── Step 3: MiDaS Depth Refinement ───
-def refine_with_depth(vertices, image_path, face_landmarks_3d, depth_strength=0.03):
-    """
-    Use MiDaS monocular depth estimation to refine vertex depths.
-    Adds subtle per-vertex depth variation based on the selfie.
+    Apply MiDaS monocular depth estimation to refine Z-depth of face vertices.
+    Only affects the front face vertices (first num_face_verts).
+    Uses consistent inverse mapping for pixel sampling.
     """
     try:
         import torch
 
-        # Load MiDaS model (small version for speed)
         model_type = "MiDaS_small"
         midas = torch.hub.load("intel-isl/MiDaS", model_type, trust_repo=True)
         midas.eval()
 
-        # Load transforms
         midas_transforms = torch.hub.load("intel-isl/MiDaS", "transforms", trust_repo=True)
         transform = midas_transforms.small_transform
 
-        # Read and transform image
         img = cv2.imread(image_path)
+        if img is None:
+            return vertices
+
         img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         input_batch = transform(img_rgb)
 
-        # Run depth estimation
         with torch.no_grad():
             prediction = midas(input_batch)
             prediction = torch.nn.functional.interpolate(
@@ -214,74 +410,50 @@ def refine_with_depth(vertices, image_path, face_landmarks_3d, depth_strength=0.
                 align_corners=False,
             ).squeeze()
 
-        depth_map = prediction.cpu().numpy()
+        depth_map = prediction.cpu().numpy().astype(np.float32)
 
-        # Normalize depth map to [0, 1]
-        depth_min = depth_map.min()
-        depth_max = depth_map.max()
-        if depth_max - depth_min > 0:
-            depth_map = (depth_map - depth_min) / (depth_max - depth_min)
-        else:
+        d_min, d_max = depth_map.min(), depth_map.max()
+        if d_max - d_min < 1e-6:
             return vertices
 
-        h, w = img.shape[:2]
+        depth_map = (depth_map - d_min) / (d_max - d_min)
 
-        # Apply depth to front vertices
-        front_mask = get_front_vertex_mask(vertices, threshold=0.0)
+        h, w = img.shape[:2]
         refined = vertices.copy()
 
-        for vi in range(len(vertices)):
-            if not front_mask[vi]:
-                continue
+        for vi in range(min(num_face_verts, len(vertices))):
+            vx, vy, _vz = refined[vi]
 
-            vert = vertices[vi]
+            lm_x = (vx / X_SCALE) + 0.5
+            lm_y = 0.5 - ((vy - Y_OFFSET) / Y_SCALE)
 
-            # Map vertex position to image pixel coordinates
-            # Vertex x maps to image column, vertex y maps to image row
-            px = int(np.clip((vert[0] / 0.12 + 0.5) * w, 0, w - 1))
-            py = int(np.clip((0.5 - (vert[1] - 0.85) / 0.28) * h, 0, h - 1))
+            px = int(np.clip(lm_x * w, 0, w - 1))
+            py = int(np.clip(lm_y * h, 0, h - 1))
 
-            depth_value = depth_map[py, px]
-
-            # Depth pushes front vertices outward (higher depth = closer to camera)
-            refined[vi, 2] += (depth_value - 0.5) * depth_strength
+            depth_val = depth_map[py, px]
+            refined[vi, 2] += (depth_val - 0.5) * depth_strength
 
         return refined
 
     except Exception as e:
-        print(f"[HeadGen] MiDaS depth refinement skipped: {e}")
+        print(f"[HeadGen] MiDaS depth skipped: {e}")
         return vertices
 
 
-# ─── Step 4: Add Neck ───
+# ──────────────────────────────────────────────────────────────────────────────
+# NECK
+# ──────────────────────────────────────────────────────────────────────────────
+
 def add_neck(vertices, faces, resolution=32):
-    """
-    Add a cylindrical neck below the head mesh.
-    Connects to the bottom ring of the head.
-    """
-    lon_steps = resolution * 2
+    head_width = float(vertices[:, 0].max() - vertices[:, 0].min())
+    head_center_x = float(vertices[:, 0].mean())
+    head_center_z = float(vertices[:, 2].mean())
+    min_y = float(vertices[:, 1].min())
 
-    # Find bottom ring of head (lowest latitude vertices)
-    min_y = vertices[:, 1].min()
-    bottom_mask = vertices[:, 1] < (min_y + 0.01)
-    bottom_indices = np.where(bottom_mask)[0]
-
-    if len(bottom_indices) < 4:
-        return vertices, faces
-
-    # Get center and radius of bottom ring
-    bottom_verts = vertices[bottom_indices]
-    center_x = bottom_verts[:, 0].mean()
-    center_z = bottom_verts[:, 2].mean()
-    radius = np.sqrt(
-        (bottom_verts[:, 0] - center_x) ** 2 +
-        (bottom_verts[:, 2] - center_z) ** 2
-    ).mean()
-
-    # Generate neck cylinder
-    neck_length = 0.06
-    neck_rings = 4
-    neck_radius_scale = 0.75  # Neck is narrower than head
+    neck_radius = max(head_width * 0.30, 0.02)
+    neck_length = 0.015
+    neck_rings = 3
+    lon_steps = max(16, resolution)
 
     neck_verts = []
     neck_faces = []
@@ -290,15 +462,14 @@ def add_neck(vertices, faces, resolution=32):
     for ring in range(neck_rings + 1):
         t = ring / neck_rings
         y = min_y - t * neck_length
-        r = radius * (neck_radius_scale + (1 - neck_radius_scale) * (1 - t))
+        r = neck_radius * (1.0 - t * 0.10)
 
         for j in range(lon_steps + 1):
             phi = 2 * np.pi * j / lon_steps
-            x = center_x + r * np.cos(phi)
-            z = center_z + r * np.sin(phi)
+            x = head_center_x + r * np.cos(phi)
+            z = head_center_z + r * np.sin(phi)
             neck_verts.append([x, y, z])
 
-    # Neck faces
     for ring in range(neck_rings):
         for j in range(lon_steps):
             v0 = base_idx + ring * (lon_steps + 1) + j
@@ -308,58 +479,36 @@ def add_neck(vertices, faces, resolution=32):
             neck_faces.append([v0, v2, v1])
             neck_faces.append([v1, v2, v3])
 
-    # Combine
-    all_verts = np.vstack([vertices, np.array(neck_verts)])
-    all_faces = np.vstack([faces, np.array(neck_faces)])
+    if neck_verts:
+        all_verts = np.vstack([vertices, np.asarray(neck_verts, dtype=np.float32)])
+        all_faces = np.vstack([faces, np.asarray(neck_faces, dtype=np.int64)])
+        return all_verts, all_faces
 
-    return all_verts, all_faces
+    return vertices, faces
 
 
-# ─── Main Pipeline ───
-def generate_full_head(image_path, face_landmarks, image_shape,
-                       resolution=32, use_depth=True, depth_strength=0.03):
-    """
-    Full pipeline: template head → landmark deformation → depth refinement → neck.
+# ──────────────────────────────────────────────────────────────────────────────
+# CLEANUP
+# ──────────────────────────────────────────────────────────────────────────────
 
-    Args:
-        image_path: Path to the selfie image
-        face_landmarks: MediaPipe face landmarks object
-        image_shape: Shape of input image (h, w, c)
-        resolution: Mesh resolution (higher = more detail, slower)
-        use_depth: Whether to apply MiDaS depth refinement
-        depth_strength: How much depth affects the mesh (0.01-0.05)
-
-    Returns:
-        trimesh.Trimesh: Complete head mesh ready for export
-    """
-    print("[HeadGen] Step 1: Generating template head mesh...")
-    vertices, faces, uvs = generate_template_head(resolution)
-    print(f"  → {len(vertices)} vertices, {len(faces)} faces")
-
-    print("[HeadGen] Step 2: Mapping face landmarks to 3D...")
-    landmarks_3d = map_landmarks_to_3d(face_landmarks.landmark, image_shape)
-    print(f"  → {len(landmarks_3d)} landmarks mapped")
-
-    print("[HeadGen] Step 3: Deforming head to match face shape...")
-    vertices = deform_to_landmarks(vertices, landmarks_3d, strength=0.7)
-
-    if use_depth:
-        print("[HeadGen] Step 4: Applying MiDaS depth refinement...")
-        vertices = refine_with_depth(vertices, image_path, landmarks_3d, depth_strength)
-    else:
-        print("[HeadGen] Step 4: Depth refinement skipped")
-
-    print("[HeadGen] Step 5: Adding neck...")
-    vertices, faces = add_neck(vertices, faces, resolution)
-
-    # Build trimesh
-    mesh = trimesh.Trimesh(vertices=vertices, faces=faces)
-
-    # Smooth the mesh
-    trimesh.smoothing.filter_laplacian(mesh, iterations=2)
-
-    # Fix normals
-    mesh.fix_normals()
-
-    print(f"[HeadGen] Done: {len(mesh.vertices)} vertices, {len(mesh.faces)} faces")
-    return mesh
+def cleanup_mesh(mesh: trimesh.Trimesh):
+    try:
+        mesh.remove_degenerate_faces()
+    except Exception:
+        pass
+    try:
+        mesh.remove_duplicate_faces()
+    except Exception:
+        pass
+    try:
+        mesh.remove_unreferenced_vertices()
+    except Exception:
+        pass
+    try:
+        mesh.merge_vertices()
+    except Exception:
+        pass
+    try:
+        mesh.fix_normals()
+    except Exception:
+        pass

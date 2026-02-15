@@ -1,15 +1,18 @@
 // src/front/js/pages/UploadPage.js
 // Complete Selfie-to-Avatar Upload Flow
+// Now with multi-angle photos + skin color detection/picker
 
 import React, { useState, useCallback } from 'react';
 import AvatarUpload from '../component/AvatarUpload';
 import AvatarViewer from '../component/AvatarViewer';
 import FaceDetectionPreview from '../component/FaceDetectionPreview';
+import MultiPhotoUpload from '../component/MultiPhotoUpload';
 import '../../styles/UploadPage.css';
 
 const UploadPage = () => {
   // State management
   const [uploadedFile, setUploadedFile] = useState(null);
+  const [sidePhotos, setSidePhotos] = useState({ left: null, right: null });
   const [facePreviewUrl, setFacePreviewUrl] = useState(null);
   const [faceDetected, setFaceDetected] = useState(false);
   const [faceMeshUrl, setFaceMeshUrl] = useState(null);
@@ -21,6 +24,9 @@ const UploadPage = () => {
   const [error, setError] = useState('');
   const [quality, setQuality] = useState('medium');
   const [debugInfo, setDebugInfo] = useState(null);
+  const [skinColor, setSkinColor] = useState(null);
+  const [detectedSkinColor, setDetectedSkinColor] = useState(null);
+  const [customSkinColor, setCustomSkinColor] = useState(null);
 
   const backendUrl = process.env.REACT_APP_BACKEND_URL || '';
 
@@ -44,7 +50,7 @@ const UploadPage = () => {
     return 4;
   };
 
-  // Step 1: Handle image upload
+  // Step 1: Handle image upload (single photo — legacy support)
   const handleUploadComplete = useCallback((previewUrl, file) => {
     setFacePreviewUrl(previewUrl);
     setUploadedFile(file);
@@ -54,16 +60,40 @@ const UploadPage = () => {
     setFullAvatarUrl(null);
     setError('');
     showToast('✅ Image uploaded - detecting face...');
-    
+
     // Auto-detect face
     detectFace(file);
+  }, []);
+
+  // Handle multi-photo updates from MultiPhotoUpload
+  const handlePhotosReady = useCallback((photos) => {
+    if (photos.front && photos.front !== uploadedFile) {
+      // New front photo
+      const previewUrl = URL.createObjectURL(photos.front);
+      setFacePreviewUrl(previewUrl);
+      setUploadedFile(photos.front);
+      setFaceDetected(false);
+      setFaceMeshUrl(null);
+      setMeshApproved(false);
+      setFullAvatarUrl(null);
+      setError('');
+      showToast('✅ Front photo uploaded - detecting face...');
+      detectFace(photos.front);
+    }
+    setSidePhotos({ left: photos.left || null, right: photos.right || null });
+  }, [uploadedFile]);
+
+  // Handle skin color change from picker
+  const handleSkinColorChange = useCallback((hex) => {
+    setCustomSkinColor(hex);
+    setSkinColor(hex);
   }, []);
 
   // Step 1b: Detect face in image
   const detectFace = async (file) => {
     setLoading(true);
     setLoadingStep('Detecting face...');
-    
+
     const formData = new FormData();
     formData.append('image', file);
 
@@ -72,9 +102,9 @@ const UploadPage = () => {
         method: 'POST',
         body: formData,
       });
-      
+
       const data = await res.json();
-      
+
       if (res.ok && data.detected) {
         setFaceDetected(true);
         setDebugInfo({
@@ -97,37 +127,69 @@ const UploadPage = () => {
     }
   };
 
-  // Step 2: Generate 3D mesh from face
+  // Step 2: Generate 3D mesh from face (now with multi-angle + skin color)
   const handleGenerateMesh = async () => {
     if (!uploadedFile) return;
-    
+
     setLoading(true);
-    setLoadingStep('Generating 3D mesh...');
+    setLoadingStep('Generating 3D head mesh...');
     setError('');
-    
+
     const formData = new FormData();
     formData.append('image', uploadedFile);
     formData.append('quality', quality);
+
+    // Add side photos if available
+    if (sidePhotos.left) {
+      formData.append('left', sidePhotos.left);
+      setLoadingStep('Generating 3D head mesh (with side profiles)...');
+    }
+    if (sidePhotos.right) {
+      formData.append('right', sidePhotos.right);
+    }
+
+    // Add skin color override if user customized
+    if (customSkinColor) {
+      formData.append('skin_color', customSkinColor);
+    }
 
     try {
       const res = await fetch(`${backendUrl}/api/generate-avatar`, {
         method: 'POST',
         body: formData,
       });
-      
+
       const data = await res.json();
-      
+
       if (res.ok && data.avatar_model_url) {
-        const url = data.avatar_model_url.startsWith('http') 
-          ? data.avatar_model_url 
+        const url = data.avatar_model_url.startsWith('http')
+          ? data.avatar_model_url
           : `${backendUrl}${data.avatar_model_url}`;
         setFaceMeshUrl(url);
+
+        // Store detected skin color from backend
+        if (data.skin_color) {
+          setDetectedSkinColor(data.skin_color.hex);
+          if (!customSkinColor) {
+            setSkinColor(data.skin_color.hex);
+          }
+        }
+
         setDebugInfo(prev => ({
           ...prev,
           meshUrl: url,
-          depthMap: data.depth_map_url
+          vertices: data.vertices,
+          faces: data.faces,
+          skinColor: data.skin_color,
+          multiAngle: data.multi_angle,
+          profileEnhanced: data.profile_enhanced,
         }));
-        showToast('✅ 3D mesh generated successfully!');
+
+        const extras = [];
+        if (data.multi_angle) extras.push('multi-angle');
+        if (data.skin_color?.source === 'auto_detected') extras.push('skin detected');
+        const extraMsg = extras.length ? ` (${extras.join(', ')})` : '';
+        showToast(`✅ 3D head mesh generated!${extraMsg}`);
       } else {
         throw new Error(data.error || 'Mesh generation failed');
       }
@@ -143,26 +205,29 @@ const UploadPage = () => {
   // Step 3: Generate full body avatar
   const handleGenerateFullAvatar = async () => {
     if (!uploadedFile) return;
-    
+
     setLoading(true);
     setLoadingStep('Building full avatar...');
     setError('');
-    
+
     const formData = new FormData();
     formData.append('image', uploadedFile);
     formData.append('auto_rig', 'true');
+    if (skinColor) {
+      formData.append('skin_color', skinColor);
+    }
 
     try {
       const res = await fetch(`${backendUrl}/api/generate-full-avatar`, {
         method: 'POST',
         body: formData,
       });
-      
+
       const data = await res.json();
-      
+
       if (res.ok && data.avatar_url) {
-        const url = data.avatar_url.startsWith('http') 
-          ? data.avatar_url 
+        const url = data.avatar_url.startsWith('http')
+          ? data.avatar_url
           : `${backendUrl}${data.avatar_url}`;
         setFullAvatarUrl(url);
         setDebugInfo(prev => ({
@@ -186,13 +251,13 @@ const UploadPage = () => {
   // Export avatar
   const handleExport = async (format = 'glb') => {
     if (!fullAvatarUrl && !faceMeshUrl) return;
-    
+
     setLoading(true);
     setLoadingStep(`Exporting as ${format.toUpperCase()}...`);
-    
+
     try {
       const avatarPath = fullAvatarUrl || faceMeshUrl;
-      
+
       const res = await fetch(`${backendUrl}/api/export-avatar`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -202,7 +267,7 @@ const UploadPage = () => {
           rigging_preset: 'unity'
         }),
       });
-      
+
       if (res.ok) {
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
@@ -227,6 +292,7 @@ const UploadPage = () => {
   // Reset to start
   const handleReset = () => {
     setUploadedFile(null);
+    setSidePhotos({ left: null, right: null });
     setFacePreviewUrl(null);
     setFaceDetected(false);
     setFaceMeshUrl(null);
@@ -234,6 +300,9 @@ const UploadPage = () => {
     setFullAvatarUrl(null);
     setError('');
     setDebugInfo(null);
+    setSkinColor(null);
+    setDetectedSkinColor(null);
+    setCustomSkinColor(null);
   };
 
   const stepLabels = ['Upload', 'Detect', 'Mesh', 'Approve', 'Avatar'];
@@ -267,38 +336,57 @@ const UploadPage = () => {
         </div>
       )}
 
-      {/* Step 1: Upload */}
+      {/* Step 1: Upload (Multi-Photo) */}
       {!facePreviewUrl && (
         <div className="step-section">
-          <h2 className="step-title">📸 Step 1: Upload Your Selfie</h2>
+          <h2 className="step-title">📸 Step 1: Upload Your Photos</h2>
           <p className="step-description">
-            Take a clear front-facing photo with good lighting. 
-            Your face should be clearly visible.
+            Upload a front-facing photo (required). Add side profiles for better 3D accuracy.
           </p>
+
+          {/* Multi-Photo Upload Component */}
+          <MultiPhotoUpload
+            onPhotosReady={handlePhotosReady}
+            onSkinColorChange={handleSkinColorChange}
+            detectedSkinColor={detectedSkinColor}
+          />
+
+          {/* Divider */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '12px',
+            margin: '16px 0', color: '#444', fontSize: '12px'
+          }}>
+            <div style={{ flex: 1, height: '1px', background: '#2a2a3e' }} />
+            <span>or use single photo</span>
+            <div style={{ flex: 1, height: '1px', background: '#2a2a3e' }} />
+          </div>
+
+          {/* Legacy single upload */}
           <AvatarUpload onUploadComplete={handleUploadComplete} />
-          
+
           <div className="tips-card">
             <h4>💡 Tips for best results:</h4>
             <ul>
               <li>Use natural lighting (avoid harsh shadows)</li>
-              <li>Face the camera directly</li>
+              <li>Face the camera directly for the front photo</li>
               <li>Keep a neutral expression</li>
               <li>Plain background works best</li>
+              <li>Side photos: turn ~45° and keep face visible</li>
             </ul>
           </div>
         </div>
       )}
 
-      {/* Face Preview */}
+      {/* Face Preview + Skin Color */}
       {facePreviewUrl && !faceMeshUrl && (
         <div className="step-section">
           <h2 className="step-title">
             {faceDetected ? '✅ Face Detected!' : '🔍 Checking Image...'}
           </h2>
-          
+
           <div className="preview-section">
             <FaceDetectionPreview imageUrl={facePreviewUrl} />
-            
+
             {debugInfo?.confidence && (
               <div className="detection-info">
                 <span className="confidence-badge">
@@ -306,7 +394,34 @@ const UploadPage = () => {
                 </span>
               </div>
             )}
-            
+
+            {/* Skin Color Display */}
+            {skinColor && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '10px',
+                padding: '8px 14px', background: 'rgba(255,255,255,0.03)',
+                borderRadius: '8px', margin: '10px 0',
+              }}>
+                <div style={{
+                  width: '28px', height: '28px', borderRadius: '50%',
+                  background: skinColor, border: '2px solid rgba(255,255,255,0.15)',
+                }} />
+                <div style={{ fontSize: '12px', color: '#888' }}>
+                  Skin tone: <span style={{ color: '#aaa', fontFamily: 'monospace' }}>{skinColor}</span>
+                  {customSkinColor ? ' (custom)' : ' (auto-detected)'}
+                </div>
+              </div>
+            )}
+
+            {/* Side photos status */}
+            {(sidePhotos.left || sidePhotos.right) && (
+              <div style={{
+                fontSize: '12px', color: '#10b981', padding: '6px 0',
+              }}>
+                📐 Side profile{sidePhotos.left && sidePhotos.right ? 's' : ''} added — enhanced 3D accuracy
+              </div>
+            )}
+
             <div className="action-buttons">
               <button onClick={handleReset} className="btn-secondary">
                 🔁 Upload Different Photo
@@ -314,35 +429,51 @@ const UploadPage = () => {
             </div>
           </div>
 
+          {/* Skin Color Customization */}
+          {faceDetected && (
+            <div style={{
+              background: 'rgba(255,255,255,0.02)',
+              border: '1px solid rgba(255,255,255,0.06)',
+              borderRadius: '10px', padding: '14px', margin: '12px 0',
+            }}>
+              <MultiPhotoUpload
+                onPhotosReady={handlePhotosReady}
+                onSkinColorChange={handleSkinColorChange}
+                detectedSkinColor={detectedSkinColor}
+                existingFrontPhoto={uploadedFile}
+              />
+            </div>
+          )}
+
           {/* Quality Selection */}
           {faceDetected && (
             <div className="quality-section">
-              <h3>Step 2: Generate 3D Mesh</h3>
-              <p>Choose quality level and generate your 3D avatar mesh.</p>
-              
+              <h3>Step 2: Generate 3D Head</h3>
+              <p>Choose quality level and generate your full 3D head mesh with skin color.</p>
+
               <div className="quality-options">
-                <label className={`quality-option ${quality === 'low' ? 'selected' : ''}`}>
+                <label className={`quality-option ${quality === 'fast' ? 'selected' : ''}`}>
                   <input
                     type="radio"
-                    value="low"
-                    checked={quality === 'low'}
+                    value="fast"
+                    checked={quality === 'fast'}
                     onChange={(e) => setQuality(e.target.value)}
                   />
                   <span className="quality-label">⚡ Fast</span>
-                  <span className="quality-desc">Lower detail, quick processing</span>
+                  <span className="quality-desc">Quick preview, no depth</span>
                 </label>
-                
-                <label className={`quality-option ${quality === 'medium' ? 'selected' : ''}`}>
+
+                <label className={`quality-option ${quality === 'balanced' ? 'selected' : ''}`}>
                   <input
                     type="radio"
-                    value="medium"
-                    checked={quality === 'medium'}
+                    value="balanced"
+                    checked={quality === 'balanced'}
                     onChange={(e) => setQuality(e.target.value)}
                   />
                   <span className="quality-label">⭐ Balanced</span>
-                  <span className="quality-desc">Good detail, moderate time</span>
+                  <span className="quality-desc">Good detail + depth mapping</span>
                 </label>
-                
+
                 <label className={`quality-option ${quality === 'high' ? 'selected' : ''}`}>
                   <input
                     type="radio"
@@ -351,16 +482,16 @@ const UploadPage = () => {
                     onChange={(e) => setQuality(e.target.value)}
                   />
                   <span className="quality-label">💎 High Quality</span>
-                  <span className="quality-desc">Best detail, longer processing</span>
+                  <span className="quality-desc">Maximum detail + MiDaS depth</span>
                 </label>
               </div>
-              
+
               <button
                 onClick={handleGenerateMesh}
                 className="btn-primary btn-large"
                 disabled={loading || !faceDetected}
               >
-                {loading ? '⏳ Processing...' : '🧠 Generate 3D Mesh'}
+                {loading ? '⏳ Processing...' : '🧠 Generate 3D Head'}
               </button>
             </div>
           )}
@@ -370,24 +501,40 @@ const UploadPage = () => {
       {/* Mesh Preview */}
       {faceMeshUrl && !meshApproved && (
         <div className="step-section">
-          <h2 className="step-title">🎭 Step 3: Preview Your Mesh</h2>
+          <h2 className="step-title">🎭 Step 3: Preview Your Head Mesh</h2>
           <p>Rotate the model to check all angles. Does it look good?</p>
-          
+
           <div className="mesh-preview">
             <AvatarViewer modelUrl={faceMeshUrl} />
-            
+
+            {/* Show skin color swatch next to preview */}
+            {skinColor && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '8px',
+                justifyContent: 'center', padding: '8px 0',
+              }}>
+                <div style={{
+                  width: '20px', height: '20px', borderRadius: '50%',
+                  background: skinColor, border: '2px solid rgba(255,255,255,0.15)',
+                }} />
+                <span style={{ fontSize: '11px', color: '#666' }}>
+                  Skin: {skinColor}
+                </span>
+              </div>
+            )}
+
             <div className="action-buttons">
-              <button 
-                onClick={() => setMeshApproved(true)} 
+              <button
+                onClick={() => setMeshApproved(true)}
                 className="btn-primary"
               >
                 ✅ Looks Good → Continue
               </button>
-              <button 
+              <button
                 onClick={() => {
                   setFaceMeshUrl(null);
                   setQuality('high');
-                }} 
+                }}
                 className="btn-secondary"
               >
                 🔄 Try Again (Higher Quality)
@@ -405,7 +552,7 @@ const UploadPage = () => {
         <div className="step-section">
           <h2 className="step-title">🧍 Step 4: Create Full Body Avatar</h2>
           <p>We'll attach your face to a body template and add rigging for animation.</p>
-          
+
           <div className="avatar-options">
             <button
               onClick={handleGenerateFullAvatar}
@@ -414,7 +561,7 @@ const UploadPage = () => {
             >
               {loading ? '⏳ Building Avatar...' : '🧍 Create Full Body Avatar'}
             </button>
-            
+
             <p className="option-note">
               Or skip this step and export just the head mesh:
             </p>
@@ -433,10 +580,10 @@ const UploadPage = () => {
       {fullAvatarUrl && (
         <div className="step-section">
           <h2 className="step-title">🎉 Your Avatar is Ready!</h2>
-          
+
           <div className="final-avatar">
             <AvatarViewer modelUrl={fullAvatarUrl} />
-            
+
             <div className="export-section">
               <h4>Download Your Avatar:</h4>
               <div className="export-buttons">
@@ -450,12 +597,12 @@ const UploadPage = () => {
                   🗂️ GLTF
                 </button>
               </div>
-              
+
               <p className="export-note">
                 GLB works with Unity, Unreal, Blender, Three.js, and most 3D software.
               </p>
             </div>
-            
+
             <div className="next-steps">
               <h4>What's Next?</h4>
               <div className="next-links">
@@ -470,7 +617,7 @@ const UploadPage = () => {
                 </a>
               </div>
             </div>
-            
+
             <button onClick={handleReset} className="btn-ghost">
               ➕ Create Another Avatar
             </button>

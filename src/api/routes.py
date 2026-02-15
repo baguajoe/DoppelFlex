@@ -340,18 +340,21 @@ def create_avatar():
 # Extracts skin color automatically, allows user override
 # Returns full head GLB with vertex colors
 
+# ─── ADD these to your routes.py ───
+# Replace your existing generate_avatar function AND add the two new endpoints below
+
 @api.route("/generate-avatar", methods=["POST"])
 def generate_avatar():
     """Generate full 3D head mesh from selfie(s).
     Supports single front photo or multi-angle (front + side profiles).
-    Extracts skin color and applies to mesh.
+    Extracts skin color, detects hair color, generates hair mesh.
     """
     try:
         import scipy.spatial as sp
     except ImportError as e:
         return jsonify({"error": f"Server missing required library: {str(e)}"}), 500
 
-    # Get images — front is required, sides are optional
+    # Get images
     front_image = request.files.get("image") or request.files.get("front")
     left_image = request.files.get("left")
     right_image = request.files.get("right")
@@ -360,7 +363,9 @@ def generate_avatar():
         return jsonify({"error": "No front photo uploaded"}), 400
 
     quality = request.form.get("quality", "balanced")
-    custom_skin_color = request.form.get("skin_color")  # Optional hex override
+    custom_skin_color = request.form.get("skin_color")
+    hair_style = request.form.get("hair_style", "short")
+    custom_hair_color = request.form.get("hair_color")
 
     # Save front photo
     front_filename = secure_filename(front_image.filename)
@@ -404,7 +409,6 @@ def generate_avatar():
         from api.skin_color_extractor import extract_skin_color, apply_skin_color_to_mesh
 
         if custom_skin_color:
-            # User provided a color override
             hex_color = custom_skin_color.lstrip("#")
             r, g, b = int(hex_color[:2], 16), int(hex_color[2:4], 16), int(hex_color[4:6], 16)
             skin_data = {
@@ -419,7 +423,21 @@ def generate_avatar():
             skin_data = extract_skin_color(front_path, landmarks, img.shape)
             skin_data["source"] = "auto_detected"
 
-        # ─── Step 3: Process side profiles ───
+        # ─── Step 3: Detect hair color ───
+        from api.hair_generator import detect_hair_color, generate_hair_mesh, merge_head_and_hair
+
+        if custom_hair_color:
+            hex_h = custom_hair_color.lstrip("#")
+            rh, gh, bh = int(hex_h[:2], 16), int(hex_h[2:4], 16), int(hex_h[4:6], 16)
+            hair_color_data = {
+                "hex": f"#{hex_h}",
+                "rgb": [rh, gh, bh],
+                "rgb_float": [rh / 255, gh / 255, bh / 255],
+            }
+        else:
+            hair_color_data = detect_hair_color(front_path, landmarks, img.shape)
+
+        # ─── Step 4: Process side profiles ───
         profile_params = None
 
         if left_path or right_path:
@@ -428,23 +446,14 @@ def generate_avatar():
                 merge_multi_angle_data,
             )
 
-            left_profile = None
-            right_profile = None
-
-            if left_path:
-                print("[generate-avatar] Processing left profile...")
-                left_profile = extract_profile_landmarks(left_path)
-
-            if right_path:
-                print("[generate-avatar] Processing right profile...")
-                right_profile = extract_profile_landmarks(right_path)
+            left_profile = extract_profile_landmarks(left_path) if left_path else None
+            right_profile = extract_profile_landmarks(right_path) if right_path else None
 
             profile_params = merge_multi_angle_data(
                 landmarks, img.shape, left_profile, right_profile
             )
-            print(f"[generate-avatar] Profile data merged: {profile_params}")
 
-        # ─── Step 4: Generate full head mesh ───
+        # ─── Step 5: Generate full head mesh ───
         quality_map = {
             "fast": {"resolution": 20, "use_depth": False, "depth_strength": 0},
             "balanced": {"resolution": 32, "use_depth": True, "depth_strength": 0.025},
@@ -463,16 +472,24 @@ def generate_avatar():
             depth_strength=settings["depth_strength"],
         )
 
-        # ─── Step 5: Apply profile deformation if available ───
+        # ─── Step 6: Apply profile deformation ───
         if profile_params and profile_params.get("has_side_data"):
             from api.multi_angle_head import apply_profile_deformation
             mesh.vertices = apply_profile_deformation(mesh.vertices, profile_params)
             mesh.fix_normals()
 
-        # ─── Step 6: Apply skin color ───
+        # ─── Step 7: Apply skin color ───
         mesh = apply_skin_color_to_mesh(mesh, skin_data["rgb_float"])
 
-        # ─── Step 7: Export ───
+        # ─── Step 8: Generate and merge hair ───
+        hair_mesh = generate_hair_mesh(
+            mesh,
+            style=hair_style,
+            hair_color_rgb_float=hair_color_data["rgb_float"],
+        )
+        mesh = merge_head_and_hair(mesh, hair_mesh)
+
+        # ─── Step 9: Export ───
         glb_filename = f"face_mesh_{uuid4().hex[:8]}.glb"
         glb_path = os.path.join(EXPORT_FOLDER, glb_filename)
         mesh.export(glb_path, file_type="glb")
@@ -492,6 +509,8 @@ def generate_avatar():
             "vertices": len(mesh.vertices),
             "faces": len(mesh.faces),
             "skin_color": skin_data,
+            "hair_color": hair_color_data,
+            "hair_style": hair_style,
             "multi_angle": bool(left_path or right_path),
             "profile_enhanced": bool(profile_params and profile_params.get("has_side_data")),
         }), 200
@@ -503,11 +522,16 @@ def generate_avatar():
         return jsonify({"error": str(e)}), 500
 
 
+@api.route("/api/hair-styles", methods=["GET"])
+def get_hair_styles():
+    """Return available hair styles for the frontend selector."""
+    from api.hair_generator import get_available_styles
+    return jsonify({"styles": get_available_styles()}), 200
+
+
 @api.route("/api/extract-skin-color", methods=["POST"])
 def extract_skin_color_endpoint():
-    """Standalone endpoint to extract skin color from a photo.
-    Useful for the 2D puppet color picker.
-    """
+    """Standalone endpoint to extract skin color from a photo."""
     image = request.files.get("image")
     if not image:
         return jsonify({"error": "No image provided"}), 400
