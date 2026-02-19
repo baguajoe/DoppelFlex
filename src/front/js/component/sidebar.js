@@ -36,6 +36,7 @@ const sidebarSections = [
       { to: "/2d-avatar", label: "2D Motion Capture" },
       { to: "/motion-from-video", label: "From Video" },
       { to: "/motion-sessions", label: "Sessions" },
+      { to: "/multi-camera-mocap", label: "Multi-Camera" }, 
     ],
   },
   {

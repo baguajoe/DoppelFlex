@@ -5,7 +5,7 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import { Pose } from "@mediapipe/pose";
 import { Camera } from "@mediapipe/camera_utils";
-import { smoothPose } from "../../utils/smoothPose";
+import { smoothPose } from "../utils/smoothPose";
 import useHandMocap from "../../hooks/useHandMocap";
 import Puppet2DRenderer, { DEFAULT_STYLE } from "../component/Puppet2DRenderer";
 import { drawHand, drawFingerBars } from "../component/Hand2DRenderer";

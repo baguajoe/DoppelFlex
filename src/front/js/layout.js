@@ -31,11 +31,12 @@ import AccountSettingsPage from './pages/AccountSettingsPage';
 import ClothingMatchPage from './pages/ClothingMatchPage';
 import MyOutfitsPage from './pages/MyOutfitsPage';
 import FaceCapturePage from './pages/FaceCapturePage';
-import FullBodyCapturePage from './pages/FullBodyCapturePage';
+import FullPerformanceCapturePage from './pages/FullPerformanceCapturePage';
 import IllustrationTo3DPage from './pages/IllustrationTo3DPage';
 import Live2DAvatarPage from './pages/Live2DAvatarPage';
 import BodyCustomizerPage from './pages/BodyCustomizerPage';
 import IllustrationPuppetPage from './pages/IllustrationPuppetPage';
+import MultiCameraMocapPage from "./pages/MultiCameraMocapPage";
 
 
 const Layout = () => {
@@ -67,6 +68,8 @@ const Layout = () => {
               <Route path="/motion-sessions" element={<MotionSessionList />} />
               <Route path="/replay-session/:sessionId" element={<ReplayMotionSession />} />
               <Route path="/video-upload" element={<VideoUploadPage />} />
+              <Route path="/multi-camera-mocap" element={<MultiCameraMocapPage />} />
+              <Route path="/full-capture" element={<FullPerformanceCapturePage />} />
 
               {/* Music & Dance */}
               <Route path="/dance-sync" element={<DanceSyncPage />} />

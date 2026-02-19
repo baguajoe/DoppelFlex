@@ -343,183 +343,6 @@ def create_avatar():
 # ─── ADD these to your routes.py ───
 # Replace your existing generate_avatar function AND add the two new endpoints below
 
-@api.route("/generate-avatar", methods=["POST"])
-def generate_avatar():
-    """Generate full 3D head mesh from selfie(s).
-    Supports single front photo or multi-angle (front + side profiles).
-    Extracts skin color, detects hair color, generates hair mesh.
-    """
-    try:
-        import scipy.spatial as sp
-    except ImportError as e:
-        return jsonify({"error": f"Server missing required library: {str(e)}"}), 500
-
-    # Get images
-    front_image = request.files.get("image") or request.files.get("front")
-    left_image = request.files.get("left")
-    right_image = request.files.get("right")
-
-    if not front_image:
-        return jsonify({"error": "No front photo uploaded"}), 400
-
-    quality = request.form.get("quality", "balanced")
-    custom_skin_color = request.form.get("skin_color")
-    hair_style = request.form.get("hair_style", "short")
-    custom_hair_color = request.form.get("hair_color")
-
-    # Save front photo
-    front_filename = secure_filename(front_image.filename)
-    front_path = os.path.join(UPLOAD_FOLDER, f"front_{front_filename}")
-    front_image.save(front_path)
-
-    # Save side photos if provided
-    left_path = None
-    right_path = None
-
-    if left_image:
-        left_filename = secure_filename(left_image.filename)
-        left_path = os.path.join(UPLOAD_FOLDER, f"left_{left_filename}")
-        left_image.save(left_path)
-
-    if right_image:
-        right_filename = secure_filename(right_image.filename)
-        right_path = os.path.join(UPLOAD_FOLDER, f"right_{right_filename}")
-        right_image.save(right_path)
-
-    try:
-        # ─── Step 1: Front face landmarks ───
-        mp_face_mesh = mp.solutions.face_mesh
-        face_mesh = mp_face_mesh.FaceMesh(
-            static_image_mode=True,
-            max_num_faces=1,
-            refine_landmarks=True,
-            min_detection_confidence=0.5,
-        )
-
-        img = cv2.imread(front_path)
-        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        results = face_mesh.process(img_rgb)
-
-        if not results.multi_face_landmarks:
-            return jsonify({"error": "No face landmarks detected in front photo"}), 400
-
-        landmarks = results.multi_face_landmarks[0]
-
-        # ─── Step 2: Extract skin color ───
-        from api.skin_color_extractor import extract_skin_color, apply_skin_color_to_mesh
-
-        if custom_skin_color:
-            hex_color = custom_skin_color.lstrip("#")
-            r, g, b = int(hex_color[:2], 16), int(hex_color[2:4], 16), int(hex_color[4:6], 16)
-            skin_data = {
-                "hex": f"#{hex_color}",
-                "rgb": [r, g, b],
-                "rgb_float": [r / 255, g / 255, b / 255],
-                "confidence": 1.0,
-                "source": "user_override",
-                "palette": [],
-            }
-        else:
-            skin_data = extract_skin_color(front_path, landmarks, img.shape)
-            skin_data["source"] = "auto_detected"
-
-        # ─── Step 3: Detect hair color ───
-        from api.hair_generator import detect_hair_color, generate_hair_mesh, merge_head_and_hair
-
-        if custom_hair_color:
-            hex_h = custom_hair_color.lstrip("#")
-            rh, gh, bh = int(hex_h[:2], 16), int(hex_h[2:4], 16), int(hex_h[4:6], 16)
-            hair_color_data = {
-                "hex": f"#{hex_h}",
-                "rgb": [rh, gh, bh],
-                "rgb_float": [rh / 255, gh / 255, bh / 255],
-            }
-        else:
-            hair_color_data = detect_hair_color(front_path, landmarks, img.shape)
-
-        # ─── Step 4: Process side profiles ───
-        profile_params = None
-
-        if left_path or right_path:
-            from api.multi_angle_head import (
-                extract_profile_landmarks,
-                merge_multi_angle_data,
-            )
-
-            left_profile = extract_profile_landmarks(left_path) if left_path else None
-            right_profile = extract_profile_landmarks(right_path) if right_path else None
-
-            profile_params = merge_multi_angle_data(
-                landmarks, img.shape, left_profile, right_profile
-            )
-
-        # ─── Step 5: Generate full head mesh ───
-        quality_map = {
-            "fast": {"resolution": 20, "use_depth": False, "depth_strength": 0},
-            "balanced": {"resolution": 32, "use_depth": True, "depth_strength": 0.025},
-            "high": {"resolution": 48, "use_depth": True, "depth_strength": 0.035},
-        }
-        settings = quality_map.get(quality, quality_map["balanced"])
-
-        from api.head_mesh_generator import generate_full_head
-
-        mesh = generate_full_head(
-            image_path=front_path,
-            face_landmarks=landmarks,
-            image_shape=img.shape,
-            resolution=settings["resolution"],
-            use_depth=settings["use_depth"],
-            depth_strength=settings["depth_strength"],
-        )
-
-        # ─── Step 6: Apply profile deformation ───
-        if profile_params and profile_params.get("has_side_data"):
-            from api.multi_angle_head import apply_profile_deformation
-            mesh.vertices = apply_profile_deformation(mesh.vertices, profile_params)
-            mesh.fix_normals()
-
-        # ─── Step 7: Apply skin color ───
-        mesh = apply_skin_color_to_mesh(mesh, skin_data["rgb_float"])
-
-        # ─── Step 8: Generate and merge hair ───
-        hair_mesh = generate_hair_mesh(
-            mesh,
-            style=hair_style,
-            hair_color_rgb_float=hair_color_data["rgb_float"],
-        )
-        mesh = merge_head_and_hair(mesh, hair_mesh)
-
-        # ─── Step 9: Export ───
-        glb_filename = f"face_mesh_{uuid4().hex[:8]}.glb"
-        glb_path = os.path.join(EXPORT_FOLDER, glb_filename)
-        mesh.export(glb_path, file_type="glb")
-
-        # Clean up temp files
-        try:
-            if left_path and os.path.exists(left_path):
-                os.remove(left_path)
-            if right_path and os.path.exists(right_path):
-                os.remove(right_path)
-        except:
-            pass
-
-        return jsonify({
-            "avatar_model_url": f"/static/exports/{glb_filename}",
-            "quality": quality,
-            "vertices": len(mesh.vertices),
-            "faces": len(mesh.faces),
-            "skin_color": skin_data,
-            "hair_color": hair_color_data,
-            "hair_style": hair_style,
-            "multi_angle": bool(left_path or right_path),
-            "profile_enhanced": bool(profile_params and profile_params.get("has_side_data")),
-        }), 200
-
-    except Exception as e:
-        print(f"[generate-avatar] Error: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
 
 
 @api.route("/api/hair-styles", methods=["GET"])
@@ -1636,3 +1459,142 @@ def export_combined_avatar():
     except Exception as e:
         print("[Export Error]", e)
         return {"error": "Failed to export combined model."}, 500
+
+# ─── ADD THIS NEW ROUTE to routes.py (don't delete the existing generate-avatar route) ───
+# This uses the template GLB approach for cleaner results
+# The frontend can call either /generate-avatar (old) or /generate-avatar-v2 (template)
+
+
+
+# ─── ADD THIS NEW ROUTE to routes.py (don't delete the existing generate-avatar route) ───
+# This uses the template GLB approach for cleaner results
+# The frontend can call either /generate-avatar (old) or /generate-avatar-v2 (template)
+
+# ─── ADD THIS NEW ROUTE to routes.py ───
+# CC4-based avatar generation with proper head model
+# Replaces the old sphere-based template_head_deformer pipeline
+
+@api.route("/generate-avatar-v2", methods=["POST"])
+def generate_avatar_v2():
+    """
+    Generate avatar using CC4 base model.
+    Loads a real Character Creator model, gently deforms the head to match
+    the selfie, projects the face texture onto UV maps.
+    
+    Form fields:
+        image (file): Front-facing selfie (required)
+        template: "neutral" | "male" | "female" (default: neutral)
+        quality: "fast" | "balanced" | "high" (default: balanced)
+        texture_style: "realistic" | "cartoon" | "stylized" (default: realistic)
+        use_texture: "true" | "false" (default: true)
+    """
+    from werkzeug.utils import secure_filename
+    from uuid import uuid4
+    import cv2
+    import mediapipe as mp
+
+    front_image = request.files.get("image") or request.files.get("front")
+    if not front_image:
+        return jsonify({"error": "No photo uploaded"}), 400
+
+    # Parameters
+    template = request.form.get("template", "neutral")
+    quality = request.form.get("quality", "balanced")
+    texture_style = request.form.get("texture_style", "realistic")
+    use_texture = request.form.get("use_texture", "true").lower() == "true"
+
+    # Save image
+    front_filename = secure_filename(front_image.filename)
+    front_path = os.path.join(UPLOAD_FOLDER, f"tmpl_{front_filename}")
+    front_image.save(front_path)
+
+    try:
+        # Step 1: Detect face landmarks
+        mp_face_mesh = mp.solutions.face_mesh
+        face_mesh = mp_face_mesh.FaceMesh(
+            static_image_mode=True,
+            max_num_faces=1,
+            refine_landmarks=True,
+            min_detection_confidence=0.5,
+        )
+
+        img = cv2.imread(front_path)
+        if img is None:
+            return jsonify({"error": "Could not read uploaded image"}), 400
+
+        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        results = face_mesh.process(img_rgb)
+
+        if not results.multi_face_landmarks:
+            return jsonify({"error": "No face detected in photo"}), 400
+
+        landmarks = results.multi_face_landmarks[0]
+
+        # Step 2: Generate using CC4 pipeline
+        from api.cc4_avatar_pipeline import generate_avatar_from_template
+
+        scene = generate_avatar_from_template(
+            image_path=front_path,
+            face_landmarks=landmarks,
+            image_shape=img.shape,
+            template=template,
+            quality=quality,
+            texture_style=texture_style,
+            use_texture=use_texture,
+        )
+
+        # Step 3: Export
+        # CC4 pipeline returns a trimesh.Scene (multi-mesh with materials)
+        glb_filename = f"avatar_v2_{uuid4().hex[:8]}.glb"
+        glb_path = os.path.join(EXPORT_FOLDER, glb_filename)
+
+        import trimesh
+        if isinstance(scene, trimesh.Scene):
+            # Scene export preserves all meshes, materials, textures
+            scene.export(glb_path, file_type="glb")
+            total_v = sum(len(g.vertices) for g in scene.geometry.values()
+                          if isinstance(g, trimesh.Trimesh))
+            total_f = sum(len(g.faces) for g in scene.geometry.values()
+                          if isinstance(g, trimesh.Trimesh))
+            mesh_count = len(scene.geometry)
+            print(f"[AvatarV2] Exported scene: {mesh_count} meshes, {total_v}v, {total_f}f")
+        else:
+            # Fallback: old pipeline returned single mesh
+            scene.export(glb_path, file_type="glb")
+            total_v = len(scene.vertices)
+            total_f = len(scene.faces)
+            mesh_count = 1
+            print(f"[AvatarV2] Exported mesh: {total_v}v, {total_f}f")
+
+        file_size_mb = os.path.getsize(glb_path) / (1024 * 1024)
+        print(f"[AvatarV2] File: {glb_filename} ({file_size_mb:.1f}MB)")
+
+        return jsonify({
+            "avatar_model_url": f"/static/exports/{glb_filename}",
+            "method": "cc4_model",
+            "template": template,
+            "quality": quality,
+            "texture_style": texture_style if use_texture else "none",
+            "vertices": total_v,
+            "faces": total_f,
+            "meshes": mesh_count,
+            "file_size_mb": round(file_size_mb, 1),
+        }), 200
+
+    except FileNotFoundError as e:
+        return jsonify({
+            "error": str(e),
+            "fix": "Place cc4_optimized.glb in static/models/"
+        }), 500
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+    finally:
+        try:
+            if os.path.exists(front_path):
+                os.remove(front_path)
+        except Exception:
+            pass

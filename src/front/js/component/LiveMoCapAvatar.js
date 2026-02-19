@@ -8,8 +8,8 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 import { Pose } from '@mediapipe/pose';
 import { Camera } from '@mediapipe/camera_utils';
-import { POSE_LANDMARKS, BONE_CONNECTIONS, STANDARD_BONES } from '../../utils/poseConstants';
-import { smoothPose } from '../../utils/smoothPose';
+import { POSE_LANDMARKS, BONE_CONNECTIONS, STANDARD_BONES } from '../utils/poseConstants';
+import { smoothPose } from '../utils/smoothPose';
 
 /**
  * Find bone with fallback names

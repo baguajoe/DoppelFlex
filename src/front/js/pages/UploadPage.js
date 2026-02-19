@@ -1,6 +1,6 @@
 // src/front/js/pages/UploadPage.js
 // Complete Selfie-to-Avatar Upload Flow
-// Now with multi-angle photos + skin color detection/picker
+// Now with template deformation + texture projection + multi-angle photos
 
 import React, { useState, useCallback } from 'react';
 import AvatarUpload from '../component/AvatarUpload';
@@ -22,11 +22,18 @@ const UploadPage = () => {
   const [loadingStep, setLoadingStep] = useState('');
   const [toast, setToast] = useState('');
   const [error, setError] = useState('');
-  const [quality, setQuality] = useState('medium');
+  const [quality, setQuality] = useState('balanced');
   const [debugInfo, setDebugInfo] = useState(null);
   const [skinColor, setSkinColor] = useState(null);
   const [detectedSkinColor, setDetectedSkinColor] = useState(null);
   const [customSkinColor, setCustomSkinColor] = useState(null);
+
+  // NEW: Template + texture state
+  const [template, setTemplate] = useState('neutral');
+  const [textureStyle, setTextureStyle] = useState('realistic');
+  const [useTexture, setUseTexture] = useState(true);
+  const [hairStyle, setHairStyle] = useState('short');
+  const [hairColor, setHairColor] = useState(null);
 
   const backendUrl = process.env.REACT_APP_BACKEND_URL || '';
 
@@ -127,7 +134,7 @@ const UploadPage = () => {
     }
   };
 
-  // Step 2: Generate 3D mesh from face (now with multi-angle + skin color)
+  // Step 2: Generate 3D mesh — USES V2 TEMPLATE ENDPOINT
   const handleGenerateMesh = async () => {
     if (!uploadedFile) return;
 
@@ -138,6 +145,10 @@ const UploadPage = () => {
     const formData = new FormData();
     formData.append('image', uploadedFile);
     formData.append('quality', quality);
+    formData.append('template', template);
+    formData.append('texture_style', textureStyle);
+    formData.append('use_texture', useTexture ? 'true' : 'false');
+    formData.append('hair_style', hairStyle);
 
     // Add side photos if available
     if (sidePhotos.left) {
@@ -148,13 +159,16 @@ const UploadPage = () => {
       formData.append('right', sidePhotos.right);
     }
 
-    // Add skin color override if user customized
+    // Add color overrides if user customized
     if (customSkinColor) {
       formData.append('skin_color', customSkinColor);
     }
+    if (hairColor) {
+      formData.append('hair_color', hairColor);
+    }
 
     try {
-      const res = await fetch(`${backendUrl}/api/generate-avatar`, {
+      const res = await fetch(`${backendUrl}/api/generate-avatar-v2`, {
         method: 'POST',
         body: formData,
       });
@@ -175,21 +189,25 @@ const UploadPage = () => {
           }
         }
 
+        // Store detected hair color
+        if (data.hair_color) {
+          setHairColor(data.hair_color.hex);
+        }
+
         setDebugInfo(prev => ({
           ...prev,
           meshUrl: url,
           vertices: data.vertices,
           faces: data.faces,
           skinColor: data.skin_color,
-          multiAngle: data.multi_angle,
-          profileEnhanced: data.profile_enhanced,
+          hairColor: data.hair_color,
+          hairStyle: data.hair_style,
+          textureStyle: data.texture_style,
+          template: data.template,
+          method: data.method,
         }));
 
-        const extras = [];
-        if (data.multi_angle) extras.push('multi-angle');
-        if (data.skin_color?.source === 'auto_detected') extras.push('skin detected');
-        const extraMsg = extras.length ? ` (${extras.join(', ')})` : '';
-        showToast(`✅ 3D head mesh generated!${extraMsg}`);
+        showToast(`✅ 3D head generated! (${data.method || 'template'})`);
       } else {
         throw new Error(data.error || 'Mesh generation failed');
       }
@@ -303,6 +321,51 @@ const UploadPage = () => {
     setSkinColor(null);
     setDetectedSkinColor(null);
     setCustomSkinColor(null);
+    setHairColor(null);
+  };
+
+  // ─── Shared styles for option selectors ───
+  const optionCardStyle = (isSelected) => ({
+    flex: 1,
+    padding: '10px 8px',
+    border: `1px solid ${isSelected ? 'rgba(139, 92, 246, 0.6)' : 'rgba(255,255,255,0.08)'}`,
+    borderRadius: '8px',
+    background: isSelected ? 'rgba(139, 92, 246, 0.1)' : 'rgba(255,255,255,0.02)',
+    cursor: 'pointer',
+    textAlign: 'center',
+    transition: 'all 0.2s',
+    minWidth: '0',
+  });
+
+  const optionLabelStyle = {
+    display: 'block',
+    fontSize: '13px',
+    fontWeight: 600,
+    color: '#e0e0e0',
+    marginBottom: '2px',
+  };
+
+  const optionDescStyle = {
+    display: 'block',
+    fontSize: '10px',
+    color: '#777',
+  };
+
+  const sectionBoxStyle = {
+    background: 'rgba(255,255,255,0.02)',
+    border: '1px solid rgba(255,255,255,0.06)',
+    borderRadius: '10px',
+    padding: '14px',
+    margin: '12px 0',
+  };
+
+  const sectionTitleStyle = {
+    fontSize: '13px',
+    fontWeight: 600,
+    color: '#aaa',
+    marginBottom: '10px',
+    textTransform: 'uppercase',
+    letterSpacing: '0.5px',
   };
 
   const stepLabels = ['Upload', 'Detect', 'Mesh', 'Approve', 'Avatar'];
@@ -431,11 +494,7 @@ const UploadPage = () => {
 
           {/* Skin Color Customization */}
           {faceDetected && (
-            <div style={{
-              background: 'rgba(255,255,255,0.02)',
-              border: '1px solid rgba(255,255,255,0.06)',
-              borderRadius: '10px', padding: '14px', margin: '12px 0',
-            }}>
+            <div style={sectionBoxStyle}>
               <MultiPhotoUpload
                 onPhotosReady={handlePhotosReady}
                 onSkinColorChange={handleSkinColorChange}
@@ -445,51 +504,112 @@ const UploadPage = () => {
             </div>
           )}
 
-          {/* Quality Selection */}
+          {/* ─── Generation Options ─── */}
           {faceDetected && (
             <div className="quality-section">
               <h3>Step 2: Generate 3D Head</h3>
-              <p>Choose quality level and generate your full 3D head mesh with skin color.</p>
+              <p>Choose your options and generate your full 3D head mesh.</p>
 
-              <div className="quality-options">
-                <label className={`quality-option ${quality === 'fast' ? 'selected' : ''}`}>
-                  <input
-                    type="radio"
-                    value="fast"
-                    checked={quality === 'fast'}
-                    onChange={(e) => setQuality(e.target.value)}
-                  />
-                  <span className="quality-label">⚡ Fast</span>
-                  <span className="quality-desc">Quick preview, no depth</span>
-                </label>
+              {/* Template Selection */}
+              <div style={sectionBoxStyle}>
+                <div style={sectionTitleStyle}>🧑 Base Template</div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  {[
+                    { id: 'neutral', label: '🧑 Neutral', desc: 'Balanced' },
+                    { id: 'male', label: '👨 Male', desc: 'Wider jaw' },
+                    { id: 'female', label: '👩 Female', desc: 'Softer features' },
+                  ].map((t) => (
+                    <div
+                      key={t.id}
+                      style={optionCardStyle(template === t.id)}
+                      onClick={() => setTemplate(t.id)}
+                    >
+                      <span style={optionLabelStyle}>{t.label}</span>
+                      <span style={optionDescStyle}>{t.desc}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
 
-                <label className={`quality-option ${quality === 'balanced' ? 'selected' : ''}`}>
-                  <input
-                    type="radio"
-                    value="balanced"
-                    checked={quality === 'balanced'}
-                    onChange={(e) => setQuality(e.target.value)}
-                  />
-                  <span className="quality-label">⭐ Balanced</span>
-                  <span className="quality-desc">Good detail + depth mapping</span>
-                </label>
+              {/* Texture Style */}
+              <div style={sectionBoxStyle}>
+                <div style={sectionTitleStyle}>🎨 Texture Style</div>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {[
+                    { id: 'realistic', label: '📷 Realistic', desc: 'Your actual face' },
+                    { id: 'cartoon', label: '🖊️ Cartoon', desc: 'Bold outlines' },
+                    { id: 'anime', label: '✨ Anime', desc: 'Smooth & stylized' },
+                    { id: 'pixel', label: '👾 Pixel', desc: 'Retro 8-bit' },
+                    { id: 'oil_paint', label: '🖌️ Oil Paint', desc: 'Artistic' },
+                  ].map((s) => (
+                    <div
+                      key={s.id}
+                      style={{ ...optionCardStyle(textureStyle === s.id && useTexture), flex: '1 1 calc(33% - 8px)' }}
+                      onClick={() => { setTextureStyle(s.id); setUseTexture(true); }}
+                    >
+                      <span style={optionLabelStyle}>{s.label}</span>
+                      <span style={optionDescStyle}>{s.desc}</span>
+                    </div>
+                  ))}
+                  <div
+                    style={{ ...optionCardStyle(!useTexture), flex: '1 1 calc(33% - 8px)' }}
+                    onClick={() => setUseTexture(false)}
+                  >
+                    <span style={optionLabelStyle}>🎭 Solid Color</span>
+                    <span style={optionDescStyle}>Skin tone only</span>
+                  </div>
+                </div>
+              </div>
 
-                <label className={`quality-option ${quality === 'high' ? 'selected' : ''}`}>
-                  <input
-                    type="radio"
-                    value="high"
-                    checked={quality === 'high'}
-                    onChange={(e) => setQuality(e.target.value)}
-                  />
-                  <span className="quality-label">💎 High Quality</span>
-                  <span className="quality-desc">Maximum detail + MiDaS depth</span>
-                </label>
+              {/* Hair Style */}
+              <div style={sectionBoxStyle}>
+                <div style={sectionTitleStyle}>💇 Hair Style</div>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {[
+                    { id: 'bald', label: '🧑‍🦲 Bald' },
+                    { id: 'buzz', label: '✂️ Buzz' },
+                    { id: 'short', label: '👦 Short' },
+                    { id: 'medium', label: '🧑 Medium' },
+                    { id: 'long', label: '👩 Long' },
+                    { id: 'afro', label: '🧑‍🦱 Afro' },
+                  ].map((h) => (
+                    <div
+                      key={h.id}
+                      style={{ ...optionCardStyle(hairStyle === h.id), flex: '1 1 calc(33% - 8px)' }}
+                      onClick={() => setHairStyle(h.id)}
+                    >
+                      <span style={{ ...optionLabelStyle, fontSize: '12px' }}>{h.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Quality Selection */}
+              <div style={sectionBoxStyle}>
+                <div style={sectionTitleStyle}>⚙️ Quality</div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  {[
+                    { id: 'fast', label: '⚡ Fast', desc: 'Quick preview' },
+                    { id: 'balanced', label: '⭐ Balanced', desc: 'Good detail' },
+                    { id: 'high', label: '💎 High', desc: 'Max quality' },
+                  ].map((q) => (
+                    <div
+                      key={q.id}
+                      style={optionCardStyle(quality === q.id)}
+                      onClick={() => setQuality(q.id)}
+                    >
+                      <span style={optionLabelStyle}>{q.label}</span>
+                      <span style={optionDescStyle}>{q.desc}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               <button
                 onClick={handleGenerateMesh}
                 className="btn-primary btn-large"
                 disabled={loading || !faceDetected}
+                style={{ marginTop: '12px', width: '100%' }}
               >
                 {loading ? '⏳ Processing...' : '🧠 Generate 3D Head'}
               </button>
