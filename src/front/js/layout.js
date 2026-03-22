@@ -32,6 +32,7 @@ import ClothingMatchPage from './pages/ClothingMatchPage';
 import MyOutfitsPage from './pages/MyOutfitsPage';
 import FaceCapturePage from './pages/FaceCapturePage';
 import FullPerformanceCapturePage from './pages/FullPerformanceCapturePage';
+import FullBodyCapturePage from './pages/FullBodyCapturePage';
 import IllustrationTo3DPage from './pages/IllustrationTo3DPage';
 import Live2DAvatarPage from './pages/Live2DAvatarPage';
 import BodyCustomizerPage from './pages/BodyCustomizerPage';
