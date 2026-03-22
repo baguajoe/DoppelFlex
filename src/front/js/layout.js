@@ -69,7 +69,7 @@ const Layout = () => {
               <Route path="/replay-session/:sessionId" element={<ReplayMotionSession />} />
               <Route path="/video-upload" element={<VideoUploadPage />} />
               <Route path="/multi-camera-mocap" element={<MultiCameraMocapPage />} />
-              <Route path="/full-capture" element={<FullPerformanceCapturePage />} />
+              <Route path="/full-performance" element={<FullPerformanceCapturePage />} />
 
               {/* Music & Dance */}
               <Route path="/dance-sync" element={<DanceSyncPage />} />

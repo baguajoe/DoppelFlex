@@ -1,10 +1,10 @@
 // src/front/js/pages/MotionCapturePage.js
-// Updated to use LiveMoCapAvatar component
+// Updated to use MotionCaptureSystem component
 // Fixed: dark theme styling, REACT_APP_BACKEND_URL consistency
 
 import React, { useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import LiveMoCapAvatar from '../component/LiveMoCapAvatar';
+import MotionCaptureSystem from '../component/MotionCaptureSystem';
 import '../../styles/Wardrobe.css';
 
 const MotionCapturePage = () => {
@@ -135,12 +135,7 @@ const MotionCapturePage = () => {
           <span className="df-card__badge df-card__badge--green">Real-time</span>
         </div>
         <div className="df-card__body" style={{ minHeight: '520px' }}>
-          <LiveMoCapAvatar
-            avatarUrl={avatarUrl}
-            showVideo={showVideo}
-            videoWidth={640}
-            onFrame={handleFrame}
-          />
+          <MotionCaptureSystem avatarUrl={avatarUrl} showWebcam={showVideo} smoothingPreset="balanced" onPoseFrame={handleFrame} />
         </div>
       </div>
 

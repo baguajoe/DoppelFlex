@@ -49,6 +49,13 @@ const BONE_NAME_VARIANTS = {
   leftToeBase:    ['mixamorig:LeftToeBase', 'mixamorigLeftToeBase', 'LeftToeBase', 'l_toe_base'],
   rightUpLeg:     ['mixamorig:RightUpLeg', 'mixamorigRightUpLeg', 'RightUpLeg', 'RightThigh', 'r_femur'],
   rightLeg:       ['mixamorig:RightLeg', 'mixamorigRightLeg', 'RightLeg', 'RightShin', 'r_tibia'],
+
+  // Face bones
+  jaw:         ['mixamorig:Jaw','mixamorigJaw','Jaw','jaw','CC_Base_JawRoot'],
+  leftEye:     ['mixamorig:LeftEye','mixamorigLeftEye','LeftEye','CC_Base_L_Eye'],
+  rightEye:    ['mixamorig:RightEye','mixamorigRightEye','RightEye','CC_Base_R_Eye'],
+  leftBrow:    ['mixamorig:LeftEyeBrow1','LeftEyeBrow1','CC_Base_L_Brow1'],
+  rightBrow:   ['mixamorig:RightEyeBrow1','RightEyeBrow1','CC_Base_R_Brow1'],
   rightFoot:      ['mixamorig:RightFoot', 'mixamorigRightFoot', 'RightFoot', 'r_foot'],
   rightToeBase:   ['mixamorig:RightToeBase', 'mixamorigRightToeBase', 'RightToeBase', 'r_toe_base'],
 };
@@ -127,7 +134,7 @@ function isVisible(lm) {
 // ─────────────────────────────────────────────────────────────
 // MAIN AVATAR RIG COMPONENT
 // ─────────────────────────────────────────────────────────────
-const AvatarRig = ({ recordedFrames, avatarUrl, liveFrame, smoothingEnabled = true }) => {
+const AvatarRig = ({ recordedFrames, avatarUrl, liveFrame, smoothingEnabled = true, visemes = [], audioRef = null }) => {
   const avatarRef = useRef();
   const frameIndex = useRef(0);
   const bonesRef = useRef({});
@@ -370,6 +377,34 @@ const AvatarRig = ({ recordedFrames, avatarUrl, liveFrame, smoothingEnabled = tr
         jaw.rotation.x = THREE.MathUtils.lerp(jaw.rotation.x, frame.jawOpen * 0.3, 0.2);
       }
     }
+
+    // ── FACE BONES ──
+    // JAW: live face capture or timed viseme playback
+    let jawTarget = 0;
+    if (frame.jawOpen !== undefined) {
+      jawTarget = frame.jawOpen * 0.3;
+    } else if (typeof visemes !== 'undefined' && visemes.length > 0 && audioRef?.current) {
+      const audioTime = audioRef.current.currentTime;
+      const VISEME_JAW = { rest:0, M:0.02, E:0.08, A:0.18, O:0.14, AH:0.25 };
+      let activeViseme = 'rest';
+      for (const v of visemes) { if (v.time <= audioTime) activeViseme = v.viseme; else break; }
+      jawTarget = VISEME_JAW[activeViseme] ?? 0;
+    }
+    if (bones.jaw) {
+      bones.jaw.rotation.x = THREE.MathUtils.lerp(bones.jaw.rotation.x, jawTarget, 0.2);
+    }
+    if (bones.leftEye && frame.leftBlink !== undefined) {
+      bones.leftEye.rotation.x = THREE.MathUtils.lerp(bones.leftEye.rotation.x, frame.leftBlink * 0.15, 0.25);
+    }
+    if (bones.rightEye && frame.rightBlink !== undefined) {
+      bones.rightEye.rotation.x = THREE.MathUtils.lerp(bones.rightEye.rotation.x, frame.rightBlink * 0.15, 0.25);
+    }
+    if (bones.leftBrow && frame.browRaise !== undefined) {
+      bones.leftBrow.rotation.y = THREE.MathUtils.lerp(bones.leftBrow.rotation.y, frame.browRaise * 0.1, 0.2);
+    }
+    if (bones.rightBrow && frame.browRaise !== undefined) {
+      bones.rightBrow.rotation.y = THREE.MathUtils.lerp(bones.rightBrow.rotation.y, frame.browRaise * 0.1, 0.2);
+    }
   });
 
   return <group ref={avatarRef} />;
@@ -378,17 +413,12 @@ const AvatarRig = ({ recordedFrames, avatarUrl, liveFrame, smoothingEnabled = tr
 // ─────────────────────────────────────────────────────────────
 // EXPORTED COMPONENT
 // ─────────────────────────────────────────────────────────────
-const AvatarRigPlayer3D = ({ recordedFrames, avatarUrl, liveFrame, smoothingEnabled }) => {
+const AvatarRigPlayer3D = ({ recordedFrames, avatarUrl, liveFrame, smoothingEnabled, visemes = [], audioRef = null }) => {
   return (
     <Canvas camera={{ position: [0, 1.5, 3], fov: 50 }}>
       <ambientLight intensity={0.8} />
       <directionalLight position={[3, 5, 5]} intensity={1} />
-      <AvatarRig 
-        recordedFrames={recordedFrames} 
-        avatarUrl={avatarUrl} 
-        liveFrame={liveFrame}
-        smoothingEnabled={smoothingEnabled}
-      />
+      <AvatarRig recordedFrames={recordedFrames} avatarUrl={avatarUrl} liveFrame={liveFrame} smoothingEnabled={smoothingEnabled} visemes={visemes} audioRef={audioRef} />
     </Canvas>
   );
 };

@@ -7,14 +7,93 @@ import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Stage } from '@react-three/drei';
 import AnimatedAvatar from '../component/AnimatedAvatar';
 import WaveformVisualizer from '../component/WaveformVisualizer';
+import AvatarRigPlayer3D from '../component/AvatarRigPlayer3D';
 import CustomAvatar from '../component/CustomAvatar';
 import '../../styles/Wardrobe.css';
 
 const BACKEND = process.env.REACT_APP_BACKEND_URL || '';
 
+
+
+// Per-genre dance frame generator
+function buildDanceFrames(genre, beatTimes) {
+  const base = () => Array.from({ length: 33 }, () => ({ x: 0.5, y: 0.5, z: 0, visibility: 1 }));
+  const L_SHOULDER=11, R_SHOULDER=12, L_ELBOW=13, R_ELBOW=14;
+  const L_WRIST=15, R_WRIST=16, L_HIP=23, R_HIP=24, L_KNEE=25, R_KNEE=26;
+
+  return beatTimes.map((beatTime, i) => {
+    const phase = i % 4;
+    const lm = base();
+
+    if (genre === 'slow') {
+      const sway = Math.sin((i / beatTimes.length) * Math.PI * 2) * 0.04;
+      lm[L_SHOULDER] = { x: 0.35 + sway, y: 0.35, z: 0, visibility: 1 };
+      lm[R_SHOULDER] = { x: 0.65 + sway, y: 0.35, z: 0, visibility: 1 };
+      lm[L_ELBOW]    = { x: 0.25 + sway, y: 0.45, z: 0.05, visibility: 1 };
+      lm[R_ELBOW]    = { x: 0.75 + sway, y: 0.45, z: 0.05, visibility: 1 };
+      lm[L_HIP]      = { x: 0.44 + sway*0.5, y: 0.58, z: 0, visibility: 1 };
+      lm[R_HIP]      = { x: 0.56 + sway*0.5, y: 0.58, z: 0, visibility: 1 };
+    } else if (genre === 'hiphop') {
+      const bounce = phase % 2 === 0 ? 0.02 : -0.01;
+      const lean   = phase < 2 ? 0.03 : -0.03;
+      lm[L_SHOULDER] = { x: 0.33, y: 0.33 + bounce, z: 0, visibility: 1 };
+      lm[R_SHOULDER] = { x: 0.67, y: 0.33 + bounce, z: 0, visibility: 1 };
+      lm[L_ELBOW]    = { x: 0.22, y: 0.44 + lean, z: 0.1, visibility: 1 };
+      lm[R_ELBOW]    = { x: 0.78, y: 0.44 - lean, z: 0.1, visibility: 1 };
+      lm[L_WRIST]    = { x: 0.15, y: 0.52 + lean, z: 0.1, visibility: 1 };
+      lm[R_WRIST]    = { x: 0.85, y: 0.52 - lean, z: 0.1, visibility: 1 };
+      lm[L_HIP]      = { x: 0.43, y: 0.58 - bounce, z: 0, visibility: 1 };
+      lm[R_HIP]      = { x: 0.57, y: 0.58 - bounce, z: 0, visibility: 1 };
+      lm[L_KNEE]     = { x: 0.42, y: 0.72 + bounce*2, z: 0, visibility: 1 };
+      lm[R_KNEE]     = { x: 0.58, y: 0.72 + bounce*2, z: 0, visibility: 1 };
+    } else if (genre === 'pop') {
+      const sway     = phase % 2 === 0 ? 0.04 : -0.04;
+      const armRaise = phase === 0 || phase === 2 ? -0.08 : 0;
+      lm[L_SHOULDER] = { x: 0.34, y: 0.32, z: 0, visibility: 1 };
+      lm[R_SHOULDER] = { x: 0.66, y: 0.32, z: 0, visibility: 1 };
+      lm[L_ELBOW]    = { x: 0.22 + sway, y: 0.28 + armRaise, z: 0.05, visibility: 1 };
+      lm[R_ELBOW]    = { x: 0.78 - sway, y: 0.28 - armRaise, z: 0.05, visibility: 1 };
+      lm[L_WRIST]    = { x: 0.15 + sway, y: 0.22 + armRaise, z: 0.05, visibility: 1 };
+      lm[R_WRIST]    = { x: 0.85 - sway, y: 0.22 - armRaise, z: 0.05, visibility: 1 };
+      lm[L_HIP]      = { x: 0.43 + sway*0.3, y: 0.57, z: 0, visibility: 1 };
+      lm[R_HIP]      = { x: 0.57 + sway*0.3, y: 0.57, z: 0, visibility: 1 };
+    } else if (genre === 'edm') {
+      const leftUp = phase === 0 || phase === 1;
+      lm[L_SHOULDER] = { x: 0.32, y: 0.30, z: 0, visibility: 1 };
+      lm[R_SHOULDER] = { x: 0.68, y: 0.30, z: 0, visibility: 1 };
+      lm[L_ELBOW]    = { x: leftUp ? 0.24 : 0.20, y: leftUp ? 0.15 : 0.42, z: 0.1, visibility: 1 };
+      lm[R_ELBOW]    = { x: !leftUp ? 0.76 : 0.80, y: !leftUp ? 0.15 : 0.42, z: 0.1, visibility: 1 };
+      lm[L_WRIST]    = { x: leftUp ? 0.26 : 0.12, y: leftUp ? 0.08 : 0.50, z: 0.1, visibility: 1 };
+      lm[R_WRIST]    = { x: !leftUp ? 0.74 : 0.88, y: !leftUp ? 0.08 : 0.50, z: 0.1, visibility: 1 };
+      if (phase % 2 === 0) lm[L_KNEE] = { x: 0.42, y: 0.62, z: 0.05, visibility: 1 };
+      else                  lm[R_KNEE] = { x: 0.58, y: 0.62, z: 0.05, visibility: 1 };
+    } else {
+      const flip = i % 2 === 0;
+      lm[L_ELBOW] = { x: flip ? 0.20 : 0.30, y: flip ? 0.35 : 0.45, z: 0.1, visibility: 1 };
+      lm[R_ELBOW] = { x: flip ? 0.80 : 0.70, y: flip ? 0.35 : 0.45, z: 0.1, visibility: 1 };
+      lm[L_WRIST] = { x: flip ? 0.15 : 0.28, y: flip ? 0.28 : 0.40, z: 0.1, visibility: 1 };
+      lm[R_WRIST] = { x: flip ? 0.85 : 0.72, y: flip ? 0.28 : 0.40, z: 0.1, visibility: 1 };
+    }
+    return { time: beatTime, landmarks: lm };
+  });
+}
+
+// BPM → genre heuristic
+function detectGenre(bpm) {
+  if (!bpm) return 'pop';
+  if (bpm < 75)  return 'slow';
+  if (bpm < 100) return 'hiphop';
+  if (bpm < 130) return 'pop';
+  if (bpm < 160) return 'edm';
+  return 'fast';
+}
+
 const DanceSyncPage = () => {
   const [beatTimes, setBeatTimes] = useState([]);
   const [tempo, setTempo] = useState(null);
+  const [genre, setGenre] = useState('pop');
+  const [danceFrames, setDanceFrames] = useState([]);
+  const [liveFrame, setLiveFrame] = useState(null);
   const [audioUrl, setAudioUrl] = useState(null);
   const [fileName, setFileName] = useState('');
   const [danceStyle, setDanceStyle] = useState('bounce');
@@ -28,6 +107,8 @@ const DanceSyncPage = () => {
   const [canvasReady, setCanvasReady] = useState(false);
 
   const avatarRef = useRef();
+  const frameIntervalRef = useRef(null);
+  const frameIdxRef = useRef(0);
   const audioRef = useRef();
   const recorderRef = useRef(null);
   const voiceRef = useRef(null);
@@ -50,7 +131,7 @@ const DanceSyncPage = () => {
       });
       const data = await res.json();
       if (data.beat_times) setBeatTimes(data.beat_times);
-      if (data.tempo) setTempo(data.tempo);
+      if (data.tempo) { setTempo(data.tempo); setGenre(detectGenre(data.tempo)); }
     } catch (err) {
       console.error('Audio analysis failed:', err);
     }
@@ -78,20 +159,43 @@ const DanceSyncPage = () => {
   };
 
   // ── Play audio + trigger avatar animation on every beat ──
+
+  const handleSaveBeatmap = async () => {
+    if (!beatTimes.length) return;
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    try {
+      const res = await fetch(`${BACKEND}/api/save-beatmap`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ song_name: fileName || 'Untitled', beat_markers: beatTimes, bpm: tempo }),
+      });
+      const data = await res.json();
+      alert(res.ok ? `✅ Beatmap saved (ID: ${data.id})` : `❌ ${data.error}`);
+    } catch (err) { alert(`❌ ${err.message}`); }
+  };
+
   const handlePlay = () => {
-    const audio = audioRef.current;
-    if (!audio || !beatTimes.length) return;
+    if (!audioRef.current || !danceFrames.length) return;
+    if (frameIntervalRef.current) clearTimeout(frameIntervalRef.current);
 
-    audio.currentTime = 0;
-    audio.play();
+    audioRef.current.currentTime = 0;
+    audioRef.current.play().catch(() => {});
 
-    beatTimes.forEach((time) => {
-      setTimeout(() => {
-        if (avatarRef.current && avatarRef.current.animate) {
-          avatarRef.current.animate();
-        }
-      }, time * 1000);
-    });
+    let beatIdx = 0;
+    const scheduleNextBeat = () => {
+      if (beatIdx >= beatTimes.length) return;
+      const now       = audioRef.current.currentTime;
+      const nextBeat  = beatTimes[beatIdx];
+      const delay     = Math.max(0, (nextBeat - now) * 1000);
+      frameIntervalRef.current = setTimeout(() => {
+        const frame = danceFrames[beatIdx % danceFrames.length];
+        if (frame) setLiveFrame({ landmarks: frame.landmarks });
+        beatIdx++;
+        scheduleNextBeat();
+      }, delay);
+    };
+    scheduleNextBeat();
   };
 
   // ── Custom avatar model upload ──
@@ -394,23 +498,14 @@ const DanceSyncPage = () => {
             <div style={{ height: '600px', background: '#080810', borderRadius: '0 0 12px 12px' }}>
               {typeof window !== 'undefined' && (
                 <Suspense fallback={<div style={{ color: '#666', textAlign: 'center', paddingTop: '200px' }}>🌀 Loading 3D Canvas...</div>}>
-                  <Canvas
-                    style={{ height: '100%', width: '100%' }}
-                    onCreated={() => setCanvasReady(true)}
-                  >
-                    <ambientLight intensity={0.6} />
-                    <directionalLight position={[5, 5, 5]} intensity={0.8} />
-                    {canvasReady && (
-                      useCustomAvatar && uploadedModel ? (
-                        <CustomAvatar url={uploadedModel} />
-                      ) : (
-                        <Stage environment="city" intensity={0.8}>
-                          <AnimatedAvatar ref={avatarRef} style={danceStyle} />
-                        </Stage>
-                      )
-                    )}
-                    <OrbitControls />
-                  </Canvas>
+                  <AvatarRigPlayer3D
+          avatarUrl={useCustomAvatar && uploadedModel ? uploadedModel : `${BACKEND}/static/models/Y_Bot.glb`}
+          liveFrame={liveFrame}
+          recordedFrames={null}
+          smoothingEnabled={true}
+          visemes={visemes}
+          audioRef={audioRef}
+        />
                 </Suspense>
               )}
             </div>

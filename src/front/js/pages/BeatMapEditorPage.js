@@ -110,6 +110,11 @@ const BeatmapEditorPage = () => {
     setBeatMarkers([]);
   };
 
+
+  const deleteMarker = (idx) => {
+    setBeatMarkers(prev => prev.filter((_, i) => i !== idx));
+  };
+
   const handleSaveBeats = async () => {
     if (!audioFile || !songName) {
       setStatus('Upload audio and enter a song name first.');

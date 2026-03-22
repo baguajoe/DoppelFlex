@@ -52,7 +52,47 @@ const BeatEditorPage = () => {
 
     init();
 
-    return () => {
+  
+
+  const deleteMarker = (idx) => {
+    setBeatMarkers(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleSave = async () => {
+    if (!beatMarkers.length) { setStatus('No markers to save'); return; }
+    const token = localStorage.getItem('token');
+    if (!token) { setStatus('Login required'); return; }
+    try {
+      const res = await fetch(`${BACKEND}/api/save-beatmap`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ song_name: songName || 'Untitled', beat_markers: beatMarkers }),
+      });
+      const data = await res.json();
+      setStatus(res.ok ? `✅ Saved (ID: ${data.id})` : `❌ ${data.error}`);
+      if (res.ok) loadSavedBeatmaps();
+    } catch (err) { setStatus(`❌ ${err.message}`); }
+  };
+
+  const loadSavedBeatmaps = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    setLoadingMaps(true);
+    try {
+      const res = await fetch(`${BACKEND}/api/load-beatmaps`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      if (Array.isArray(data)) setSavedBeatmaps(data);
+    } catch {} finally { setLoadingMaps(false); }
+  };
+
+  const handleDeleteBeatmap = async (id) => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    await fetch(`${BACKEND}/api/delete-beatmap/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+    setSavedBeatmaps(prev => prev.filter(b => b.id !== id));
+  };
+
+  return () => {
       mounted = false;
       if (wavesurferRef.current) {
         wavesurferRef.current.destroy();
@@ -100,6 +140,46 @@ const BeatEditorPage = () => {
   };
 
   const sortedBeats = [...beatMarkers].sort((a, b) => a - b);
+
+
+
+  const deleteMarker = (idx) => {
+    setBeatMarkers(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleSave = async () => {
+    if (!beatMarkers.length) { setStatus('No markers to save'); return; }
+    const token = localStorage.getItem('token');
+    if (!token) { setStatus('Login required'); return; }
+    try {
+      const res = await fetch(`${BACKEND}/api/save-beatmap`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ song_name: songName || 'Untitled', beat_markers: beatMarkers }),
+      });
+      const data = await res.json();
+      setStatus(res.ok ? `✅ Saved (ID: ${data.id})` : `❌ ${data.error}`);
+      if (res.ok) loadSavedBeatmaps();
+    } catch (err) { setStatus(`❌ ${err.message}`); }
+  };
+
+  const loadSavedBeatmaps = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    setLoadingMaps(true);
+    try {
+      const res = await fetch(`${BACKEND}/api/load-beatmaps`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      if (Array.isArray(data)) setSavedBeatmaps(data);
+    } catch {} finally { setLoadingMaps(false); }
+  };
+
+  const handleDeleteBeatmap = async (id) => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    await fetch(`${BACKEND}/api/delete-beatmap/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+    setSavedBeatmaps(prev => prev.filter(b => b.id !== id));
+  };
 
   return (
     <div className="df-page">

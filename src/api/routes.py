@@ -539,28 +539,49 @@ def analyze_beats():
 
 @api.route("/analyze-voice", methods=["POST"])
 def analyze_voice():
+    """Real viseme extraction using librosa RMS amplitude analysis."""
     audio = request.files.get("audio")
     if not audio:
         return jsonify({"error": "No audio uploaded"}), 400
-
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_file:
-        audio.save(temp_file.name)
-        y, sr = librosa.load(temp_file.name)
+    tmp_path = None
+    try:
+        import numpy as np
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
+            audio.save(tmp.name)
+            tmp_path = tmp.name
+        y, sr = librosa.load(tmp_path, sr=None, mono=True)
         duration = librosa.get_duration(y=y, sr=sr)
+        frame_length = int(sr * 0.020)
+        hop_length   = int(sr * 0.010)
+        rms = librosa.feature.rms(y=y, frame_length=frame_length, hop_length=hop_length)[0]
+        rms_max  = float(rms.max()) if rms.max() > 0 else 1.0
+        rms_norm = rms / rms_max
+        times = librosa.frames_to_time(np.arange(len(rms)), sr=sr, hop_length=hop_length)
+        def energy_to_viseme(e):
+            if e < 0.05:  return "rest"
+            if e < 0.15:  return "M"
+            if e < 0.30:  return "E"
+            if e < 0.50:  return "A"
+            if e < 0.70:  return "O"
+            return "AH"
+        visemes, prev = [], None
+        for t, e in zip(times, rms_norm):
+            v = energy_to_viseme(float(e))
+            if v != prev:
+                visemes.append({"time": round(float(t), 3), "viseme": v})
+                prev = v
+        if not visemes or visemes[-1]["viseme"] != "rest":
+            visemes.append({"time": round(duration, 3), "viseme": "rest"})
+        return jsonify({"duration": round(duration, 3), "visemes": visemes, "method": "librosa_rms"}), 200
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            try: os.remove(tmp_path)
+            except: pass
 
-        mock_visemes = [
-            {"time": 0.0, "viseme": "A"},
-            {"time": 0.3, "viseme": "E"},
-            {"time": 0.5, "viseme": "O"},
-            {"time": 0.8, "viseme": "M"}
-        ]
 
-        return jsonify({"duration": duration, "visemes": mock_visemes}), 200
-
-
-# ═══════════════════════════════════════════════════════════════
-#  POSE / MOTION CAPTURE
-# ═══════════════════════════════════════════════════════════════
 
 @api.route('/process-pose', methods=['POST'])
 def process_pose():
@@ -1291,67 +1312,73 @@ def get_colors():
 
 @api.route('/export-avatar', methods=['POST'])
 def export_avatar():
-    data = request.json
-    rigging_preset = data.get('riggingPreset')
-    avatar_model = data.get('avatarModel')
-    file_type = data.get('fileType', 'fbx')
-
-    bone_mappings = {
-        'unity': {
-            'root': 'root', 'pelvis': 'Hips', 'spine': 'Spine',
-            'spine_02': 'Chest', 'neck_01': 'Neck', 'head': 'Head',
-            'l_clavicle': 'LeftShoulder', 'l_upper_arm': 'LeftUpperArm',
-            'l_forearm': 'LeftLowerArm', 'l_hand': 'LeftHand',
-            'r_clavicle': 'RightShoulder', 'r_upper_arm': 'RightUpperArm',
-            'r_forearm': 'RightLowerArm', 'r_hand': 'RightHand',
-            'l_femur': 'LeftThigh', 'l_tibia': 'LeftShin', 'l_foot': 'LeftFoot',
-            'r_femur': 'RightThigh', 'r_tibia': 'RightShin', 'r_foot': 'RightFoot',
-            'l_toe_base': 'LeftToeBase', 'r_toe_base': 'RightToeBase',
-        },
-        'unreal': {
-            'root': 'root', 'pelvis': 'pelvis', 'spine': 'spine_01',
-            'spine_02': 'spine_02', 'spine_03': 'spine_03',
-            'neck': 'neck_01', 'head': 'head',
-            'l_clavicle': 'l_clavicle', 'l_upper_arm': 'l_upper_arm',
-            'l_forearm': 'l_forearm', 'l_hand': 'l_hand',
-            'r_clavicle': 'r_clavicle', 'r_upper_arm': 'r_upper_arm',
-            'r_forearm': 'r_forearm', 'r_hand': 'r_hand',
-            'l_femur': 'l_femur', 'l_tibia': 'l_tibia', 'l_foot': 'l_foot',
-            'r_femur': 'r_femur', 'r_tibia': 'r_tibia', 'r_foot': 'r_foot',
-        },
-        'maya': {
-            'root': 'root', 'pelvis': 'pelvis', 'spine': 'spine',
-            'neck': 'neck', 'head': 'head',
-            'l_shoulder': 'l_shoulder', 'r_shoulder': 'r_shoulder',
-            'l_upper_arm': 'l_upper_arm', 'r_upper_arm': 'r_upper_arm',
-            'l_forearm': 'l_forearm', 'r_forearm': 'r_forearm',
-            'l_hand': 'l_hand', 'r_hand': 'r_hand',
-            'l_thigh': 'l_thigh', 'r_thigh': 'r_thigh',
-            'l_shin': 'l_shin', 'r_shin': 'r_shin',
-            'l_foot': 'l_foot', 'r_foot': 'r_foot',
-        }
-    }
-
-    bones = bone_mappings.get(rigging_preset)
-    if not bones:
-        return jsonify({"error": f"Unsupported rigging preset: {rigging_preset}"}), 400
-
+    """Export avatar as GLB, OBJ, PLY, or FBX (via Blender if available)."""
+    data          = request.get_json() or {}
+    rigging_preset = data.get("riggingPreset", "unity")
+    avatar_model  = data.get("avatarModel") or data.get("avatar_path", "")
+    file_type     = data.get("fileType", data.get("format", "glb")).lower()
+    if not avatar_model:
+        return jsonify({"error": "No avatar model path provided"}), 400
+    avatar_path = avatar_model.lstrip("/")
+    candidates = [
+        avatar_path,
+        os.path.join("src", avatar_path),
+        os.path.join("..", avatar_path),
+        os.path.join(EXPORT_FOLDER, os.path.basename(avatar_path)),
+        os.path.join(UPLOAD_FOLDER, os.path.basename(avatar_path)),
+    ]
+    resolved_path = next((c for c in candidates if os.path.exists(c)), None)
+    if not resolved_path:
+        return jsonify({"error": f"Avatar file not found: {avatar_path}"}), 404
     try:
-        file_path = f"exports/{rigging_preset}_avatar.{file_type}"
-        os.makedirs("exports", exist_ok=True)
-
-        exporter = FBXExporter()
-        exporter.export(avatar_model, bone_structure=bones, output_path=file_path)
-
-        return send_file(file_path, as_attachment=True,
-                         download_name=f"{rigging_preset}_avatar.{file_type}")
+        base_name   = os.path.splitext(os.path.basename(resolved_path))[0]
+        out_filename = f"{base_name}_{rigging_preset}.{file_type}"
+        out_path    = os.path.join(EXPORT_FOLDER, out_filename)
+        os.makedirs(EXPORT_FOLDER, exist_ok=True)
+        if file_type == "fbx":
+            import shutil as _shutil
+            blender_cmd = _shutil.which("blender") or _shutil.which("blender3.6") or _shutil.which("blender4.0")
+            if blender_cmd:
+                script = f"""
+import bpy
+bpy.ops.object.select_all(action='SELECT')
+bpy.ops.object.delete(use_global=False)
+bpy.ops.import_scene.gltf(filepath=r'{os.path.abspath(resolved_path)}')
+bpy.ops.export_scene.fbx(filepath=r'{os.path.abspath(out_path)}', embed_textures=True, path_mode='COPY')
+print('FBX_EXPORT_SUCCESS')
+"""
+                tmp_script = tempfile.mktemp(suffix=".py")
+                with open(tmp_script, "w") as f_s: f_s.write(script)
+                try:
+                    import subprocess
+                    result = subprocess.run([blender_cmd, "--background", "--python", tmp_script],
+                                            capture_output=True, text=True, timeout=120)
+                    if "FBX_EXPORT_SUCCESS" in result.stdout and os.path.exists(out_path):
+                        return send_file(out_path, as_attachment=True, download_name=out_filename,
+                                         mimetype="application/octet-stream")
+                finally:
+                    try: os.remove(tmp_script)
+                    except: pass
+            file_type     = "glb"
+            out_filename  = f"{base_name}_{rigging_preset}_fbx_fallback.glb"
+            out_path      = os.path.join(EXPORT_FOLDER, out_filename)
+        mesh = trimesh.load(resolved_path)
+        if file_type in ("glb", "obj", "ply"):
+            if isinstance(mesh, trimesh.Scene) and file_type != "glb":
+                mesh = trimesh.util.concatenate(
+                    [g for g in mesh.geometry.values() if isinstance(g, trimesh.Trimesh)])
+            mesh.export(out_path, file_type=file_type)
+        else:
+            return jsonify({"error": f"Unsupported format: {file_type}"}), 400
+        if not os.path.exists(out_path):
+            return jsonify({"error": "Export produced no output file"}), 500
+        return send_file(out_path, as_attachment=True, download_name=out_filename,
+                         mimetype="application/octet-stream")
     except Exception as e:
-        return jsonify({"error": str(e)}), 400
+        import traceback; traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
 
 
-# ═══════════════════════════════════════════════════════════════
-#  OUTFITS / WARDROBE
-# ═══════════════════════════════════════════════════════════════
 
 @api.route("/save-outfit", methods=["POST"])
 @jwt_required()
@@ -1598,3 +1625,44 @@ def generate_avatar_v2():
                 os.remove(front_path)
         except Exception:
             pass
+
+@api.route("/save-beatmap", methods=["POST"])
+@jwt_required()
+def save_beatmap():
+    user_id = get_jwt_identity()
+    data = request.get_json() or {}
+    song_name    = data.get("song_name", "Untitled")
+    beat_markers = data.get("beat_markers", [])
+    bpm          = data.get("bpm")
+    if not beat_markers:
+        return jsonify({"error": "No beat markers provided"}), 400
+    sync = MotionAudioSync(user_id=user_id, song_name=song_name,
+                           beat_times=json.dumps(beat_markers), bpm=bpm)
+    db.session.add(sync)
+    db.session.commit()
+    return jsonify({"message": "Beatmap saved", "id": sync.id,
+                    "beat_count": len(beat_markers)}), 201
+
+
+@api.route("/load-beatmaps", methods=["GET"])
+@jwt_required()
+def load_beatmaps():
+    user_id = get_jwt_identity()
+    syncs = MotionAudioSync.query.filter_by(user_id=user_id).order_by(MotionAudioSync.id.desc()).all()
+    return jsonify([{
+        "id": s.id, "song_name": s.song_name,
+        "beat_markers": json.loads(s.beat_times) if s.beat_times else [],
+        "bpm": s.bpm,
+    } for s in syncs]), 200
+
+
+@api.route("/delete-beatmap/<int:beatmap_id>", methods=["DELETE"])
+@jwt_required()
+def delete_beatmap(beatmap_id):
+    user_id = get_jwt_identity()
+    sync = MotionAudioSync.query.filter_by(id=beatmap_id, user_id=user_id).first()
+    if not sync:
+        return jsonify({"error": "Beatmap not found"}), 404
+    db.session.delete(sync)
+    db.session.commit()
+    return jsonify({"message": "Beatmap deleted"}), 200

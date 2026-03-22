@@ -166,6 +166,7 @@ const FullBodyCapturePage = () => {
               smoothingPreset="balanced"
               onPoseFrame={handlePoseFrame}
               externalStream={streams.body}
+              faceFrame={faceExpressions}
             />
           </div>
         </div>

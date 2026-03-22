@@ -12,6 +12,8 @@ const ReplayMotionSession = () => {
 
   const [frames, setFrames] = useState([]);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [currentFrame, setCurrentFrame] = useState(0);
+  const [loop, setLoop] = useState(false);
   const [audioFile, setAudioFile] = useState(null);
   const [audioUrl, setAudioUrl] = useState(null);
   const [modelUrl, setModelUrl] = useState(DEFAULT_MODEL);
@@ -257,7 +259,27 @@ const ReplayMotionSession = () => {
 
       {/* Playback Controls */}
       <div className="mb-4 d-flex gap-2 flex-wrap align-items-center">
-        {!isPlaying ? (
+        
+              {/* Scrubber */}
+              {frames.length > 0 && (
+                <div style={{ marginBottom: '8px' }}>
+                  <input
+                    type="range" min={0} max={Math.max(0, frames.length - 1)}
+                    value={currentFrame}
+                    onChange={(e) => {
+                      const idx = parseInt(e.target.value, 10);
+                      setCurrentFrame(idx);
+                    }}
+                    style={{ width: '100%', accentColor: '#8b5cf6' }}
+                    disabled={isPlaying}
+                  />
+                  <div style={{ display:'flex', justifyContent:'space-between', fontSize:'11px', color:'#888' }}>
+                    <span>Frame {currentFrame}</span>
+                    <span>{frames.length} total</span>
+                  </div>
+                </div>
+              )}
+{!isPlaying ? (
           <button
             className="btn btn-success"
             onClick={handlePlay}
