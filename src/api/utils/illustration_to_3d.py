@@ -149,7 +149,7 @@ def estimate_depth_illustration(image_path, mask):
 
 
 def create_mesh_from_depth(img_np, depth_map, mask, illustration_type="full_body",
-                           depth_scale=80, sample_step=2, poisson_depth=8):
+                           depth_scale=120, sample_step=1, poisson_depth=9):
     """
     Create 3D mesh from depth map and color image.
     
@@ -286,6 +286,13 @@ def illustration_to_3d(input_path, output_dir="static/exports",
 
     # Step 3: Create mesh
     mesh = create_mesh_from_depth(img_np, depth_map, mask, illustration_type)
+
+    # Smooth the mesh for cleaner results
+    if mesh is not None and hasattr(mesh, 'filter_smooth_simple'):
+        try:
+            mesh.filter_smooth_simple(number_of_iterations=3)
+        except Exception:
+            pass
 
     if mesh is None:
         # Cleanup

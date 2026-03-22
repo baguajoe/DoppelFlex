@@ -156,6 +156,68 @@ const IllustrationPuppetPage = () => {
     URL.revokeObjectURL(url);
   };
 
+
+  // Export puppet as PNG image
+  const handleExportPNG = () => {
+    // Find the puppet canvas and export it
+    const canvas = document.querySelector('.illus-puppet-canvas');
+    if (!canvas) { alert('No puppet to export'); return; }
+    const url = canvas.toDataURL('image/png');
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `illustration_puppet_${Date.now()}.png`;
+    a.click();
+  };
+
+  // Save puppet to backend
+  const handleSaveToBackend = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) { alert('Login required to save'); return; }
+    const canvas = document.querySelector('.illus-puppet-canvas');
+    const thumbnail = canvas ? canvas.toDataURL('image/png') : null;
+    try {
+      const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/save-puppet`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          name: `Illustration Puppet ${new Date().toLocaleString()}`,
+          proportions: proportions,
+          preset: activePreset,
+          thumbnail_url: thumbnail,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) alert(`✅ Puppet saved (ID: ${data.id})`);
+      else alert(`❌ ${data.error}`);
+    } catch (err) { alert(`❌ ${err.message}`); }
+  };
+
+  // Use puppet in live 2D motion capture
+  const handleUseinMocap = () => {
+    // Store puppet config so Live2DAvatarPage can load it
+    localStorage.setItem('puppet_proportions', JSON.stringify(proportions));
+    localStorage.setItem('puppet_preset', activePreset || 'custom');
+    if (segmentedParts) {
+      // Store part image data URLs
+      const partData = {};
+      Object.entries(segmentedParts).forEach(([key, val]) => {
+        if (val && val instanceof HTMLImageElement) {
+          try {
+            const c = document.createElement('canvas');
+            c.width = val.naturalWidth || val.width;
+            c.height = val.naturalHeight || val.height;
+            c.getContext('2d').drawImage(val, 0, 0);
+            partData[key] = c.toDataURL('image/png');
+          } catch (e) {}
+        }
+      });
+      if (Object.keys(partData).length > 0) {
+        localStorage.setItem('puppet_parts', JSON.stringify(partData));
+      }
+    }
+    window.location.href = '/2d-avatar';
+  };
+
   return (
     <div className="illus-puppet-page">
       <div className="ipp-header">
@@ -166,7 +228,12 @@ const IllustrationPuppetPage = () => {
           </p>
         </div>
         {segmentedParts && (
-          <button className="ipp-export-btn" onClick={handleExport}>📥 Export</button>
+          <div style={{display:"flex",gap:"8px",flexWrap:"wrap"}}>
+          <button className="ipp-export-btn" onClick={handleExport}>📥 Export JSON</button>
+          <button className="ipp-export-btn" onClick={handleExportPNG} style={{background:"#0f6e56"}}>🖼 Export PNG</button>
+          <button className="ipp-export-btn" onClick={handleSaveToBackend} style={{background:"#3C3489"}}>💾 Save</button>
+          <button className="ipp-export-btn" onClick={handleUseinMocap} style={{background:"#993C1D"}}>🎥 Use in Mocap</button>
+        </div>
         )}
       </div>
 

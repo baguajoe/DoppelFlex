@@ -383,6 +383,40 @@ const Live2DAvatarPage = () => {
     img.src = URL.createObjectURL(file);
   };
 
+
+  // Load puppet parts from IllustrationPuppetPage if available
+  useEffect(() => {
+    const savedParts = localStorage.getItem('puppet_parts');
+    const savedProportions = localStorage.getItem('puppet_proportions');
+    if (savedParts) {
+      try {
+        const partData = JSON.parse(savedParts);
+        const loadedParts = {};
+        let pendingCount = Object.keys(partData).length;
+        if (pendingCount === 0) return;
+        Object.entries(partData).forEach(([key, dataUrl]) => {
+          const img = new Image();
+          img.onload = () => {
+            loadedParts[key] = img;
+            pendingCount--;
+            if (pendingCount === 0) {
+              setCustomParts({ ...loadedParts, loaded: true });
+            }
+          };
+          img.src = dataUrl;
+        });
+      } catch (e) {
+        console.warn('[Live2D] Could not load puppet parts:', e);
+      }
+    }
+    if (savedProportions) {
+      try {
+        const props = JSON.parse(savedProportions);
+        setPuppetStyle(prev => ({ ...prev, ...proportionsToPuppetStyle(props) }));
+      } catch (e) {}
+    }
+  }, []);
+
   return (
     <div className="container mt-4">
       <h2>🎭 2D Avatar Motion Capture</h2>

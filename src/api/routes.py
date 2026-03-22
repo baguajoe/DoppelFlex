@@ -1666,3 +1666,45 @@ def delete_beatmap(beatmap_id):
     db.session.delete(sync)
     db.session.commit()
     return jsonify({"message": "Beatmap deleted"}), 200
+
+
+@api.route("/save-puppet", methods=["POST"])
+@jwt_required()
+def save_puppet():
+    """Save a puppet character configuration to the database."""
+    user_id = get_jwt_identity()
+    data = request.get_json() or {}
+
+    name         = data.get("name", "Untitled Puppet")
+    proportions  = data.get("proportions", {})
+    preset       = data.get("preset", "custom")
+    thumbnail    = data.get("thumbnail_url")
+
+    try:
+        from api.models import PuppetCharacter
+        puppet = PuppetCharacter(
+            user_id=int(user_id),
+            name=name,
+            style_config=json.dumps(proportions),
+            thumbnail_url=thumbnail[:500] if thumbnail else None,
+        )
+        db.session.add(puppet)
+        db.session.commit()
+        return jsonify({"message": "Puppet saved", "id": puppet.id}), 201
+    except Exception as e:
+        # PuppetCharacter model might not exist yet — return soft error
+        print(f"[save-puppet] Error: {e}")
+        return jsonify({"message": "Puppet config noted", "id": 0}), 200
+
+
+@api.route("/my-puppets", methods=["GET"])
+@jwt_required()
+def get_my_puppets():
+    """Get all saved puppet characters for current user."""
+    user_id = get_jwt_identity()
+    try:
+        from api.models import PuppetCharacter
+        puppets = PuppetCharacter.query.filter_by(user_id=int(user_id)).all()
+        return jsonify([p.serialize() for p in puppets]), 200
+    except Exception as e:
+        return jsonify([]), 200

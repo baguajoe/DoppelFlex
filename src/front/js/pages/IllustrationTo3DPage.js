@@ -96,6 +96,10 @@ const IllustrationTo3DPage = () => {
         setError(data.error);
         setResult(null);
       } else {
+        // Save to localStorage so Rig/Motion/Avatar pages can pick it up
+        const fullModelUrl = `${process.env.REACT_APP_BACKEND_URL}${data.model_url}`;
+        localStorage.setItem('avatar_url', fullModelUrl);
+        localStorage.setItem('last_illustration_model', fullModelUrl);
         setResult({
           modelUrl: `${process.env.REACT_APP_BACKEND_URL}${data.model_url}`,
           depthPreviewUrl: `${process.env.REACT_APP_BACKEND_URL}${data.depth_preview_url}`,
@@ -324,7 +328,12 @@ const IllustrationTo3DPage = () => {
               </button>
 
               {error && (
-                <div className="alert alert-danger mt-3 mb-0">{error}</div>
+                <div className="alert alert-danger mt-3 mb-0">
+                  <strong>❌ {error}</strong>
+                  <div className="mt-1" style={{fontSize:"12px"}}>
+                    Tips: Use PNG with transparent background, clear outlines, front-facing pose.
+                  </div>
+                </div>
               )}
             </div>
           </div>
@@ -416,8 +425,24 @@ const IllustrationTo3DPage = () => {
             <button
               className="btn btn-outline-primary"
               onClick={() => {
-                // Navigate to rig page with the model
-                window.location.href = `/rig?model=${encodeURIComponent(result.modelUrl)}`;
+                localStorage.setItem('avatar_url', result.modelUrl);
+                window.location.href = '/rig';
+              }}
+            >
+              ✅ Use as Avatar</button>
+            <button
+              className="btn btn-outline-success"
+              onClick={() => {
+                localStorage.setItem('avatar_url', result.modelUrl);
+                window.location.href = '/avatar-view';
+              }}
+            >
+              🧍 View Avatar</button>
+            <button
+              className="btn btn-outline-primary"
+              onClick={() => {
+                localStorage.setItem('avatar_url', result.modelUrl);
+                window.location.href = '/rig';
               }}
             >
               🦴 Rig for Animation
@@ -426,7 +451,8 @@ const IllustrationTo3DPage = () => {
             <button
               className="btn btn-outline-primary"
               onClick={() => {
-                window.location.href = `/motion?model=${encodeURIComponent(result.modelUrl)}`;
+                localStorage.setItem('avatar_url', result.modelUrl);
+                window.location.href = '/motion';
               }}
             >
               🎥 Use in Motion Capture
