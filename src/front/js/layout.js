@@ -34,6 +34,7 @@ import FaceCapturePage from './pages/FaceCapturePage';
 import FullPerformanceCapturePage from './pages/FullPerformanceCapturePage';
 import FullBodyCapturePage from './pages/FullBodyCapturePage';
 import IllustrationTo3DPage from './pages/IllustrationTo3DPage';
+import DrawingPadPage from './pages/DrawingPadPage';
 import Live2DAvatarPage from './pages/Live2DAvatarPage';
 import BodyCustomizerPage from './pages/BodyCustomizerPage';
 import IllustrationPuppetPage from './pages/IllustrationPuppetPage';
@@ -57,6 +58,7 @@ const Layout = () => {
               <Route path="/avatar-view" element={<AvatarViewPage />} />
               <Route path="/export-avatar" element={<AvatarExportPage />} />
               <Route path="/illustration-to-3d" element={<IllustrationTo3DPage />} />
+              <Route path="/drawing-pad" element={<DrawingPadPage />} />
               <Route path="/illustration-puppet" element={<IllustrationPuppetPage />} />
               <Route path="/body-customizer" element={<BodyCustomizerPage />} />
 

@@ -218,6 +218,30 @@ const IllustrationPuppetPage = () => {
     window.location.href = '/2d-avatar';
   };
 
+
+  // Auto-load drawing from DrawingPad if available
+  React.useEffect(() => {
+    const padImage = localStorage.getItem('drawing_pad_image');
+    if (padImage) {
+      localStorage.removeItem('drawing_pad_image');
+      // Convert data URL to File and trigger upload
+      fetch(padImage)
+        .then(r => r.blob())
+        .then(blob => {
+          const file = new File([blob], 'drawing_pad.png', { type: 'image/png' });
+          // Trigger the IllustrationSegmenter upload programmatically
+          const input = document.querySelector('.illus-upload-area input[type="file"]');
+          if (input) {
+            const dt = new DataTransfer();
+            dt.items.add(file);
+            input.files = dt.files;
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+        })
+        .catch(() => {});
+    }
+  }, []);
+
   return (
     <div className="illus-puppet-page">
       <div className="ipp-header">

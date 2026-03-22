@@ -141,6 +141,9 @@ const IllustrationTo3DPage = () => {
         Upload a hand-drawn or digital 2D illustration and convert it into a 3D
         model. Works with head portraits and full-body character art.
       </p>
+      <div style={{marginBottom:"16px"}}>
+        <a href="/drawing-pad" style={{color:"#a78bfa",fontSize:"13px"}}>✏️ Or draw directly in DoppelFlex →</a>
+      </div>
 
       {/* Progress Steps */}
       <div className="d-flex gap-2 mb-4">
